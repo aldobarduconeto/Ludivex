@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=ludivex
+Comment=All your games. One place. Jogos, ofertas e dispositivos Bluetooth.
+Exec=@BINARY_NAME@
+Icon=@APPLICATION_ID@
+Terminal=false
+Categories=Game;Utility;
+StartupWMClass=@APPLICATION_ID@

@@ -1,0 +1,240 @@
+name: Ludivex - Multi-Platform Build & Release
+
+on:
+  push:
+    tags:
+      - 'v1.1s.0'
+  workflow_dispatch:
+
+jobs:
+  # ------------------------------------------------------
+  # 1. Android (APK)
+  # ------------------------------------------------------
+  build-ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Configurar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Instalar dependências
+        run: flutter pub get
+
+      - name: Build do APK
+        run: flutter build apk --release
+
+      - name: Renomear APK
+        run: mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/Ludivex.apk
+
+      - name: Upload do Artefato Android
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ludivex-Android
+          path: build/app/outputs/flutter-apk/Ludivex.apk
+
+  # ------------------------------------------------------
+  # 2. Windows Executável & Instalador .exe (Inno Setup)
+  # ------------------------------------------------------
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Instalar dependências
+        run: flutter pub get
+
+      - name: Build do Windows
+        run: flutter build windows --release
+
+      - name: Baixar e Instalar Inno Setup
+        run: choco install innosetup -y
+
+      - name: Gerar Instalador EXE (Inno Setup)
+        shell: powershell
+        run: |
+          $issContent = @"
+          [Setup]
+          AppName=Ludivex
+          AppVersion=1.0.0
+          DefaultDirName={autopf}\Ludivex
+          DefaultGroupName=Ludivex
+          OutputDir=.
+          OutputBaseFilename=Ludivex-Setup
+          Compression=lzma
+          SolidCompression=yes
+          [Files]
+          Source: "build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+          [Icons]
+          Name: "{group}\Ludivex"; Filename: "{app}\Ludivex.exe"
+          "@
+          Set-Content -Path setup.iss -Value $issContent
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
+
+      - name: Upload do Instalador EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ludivex-Windows-Setup
+          path: Ludivex-Setup.exe
+
+  # ------------------------------------------------------
+  # 3. macOS (.dmg) e iOS (.ipa)
+  # ------------------------------------------------------
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Instalar dependências
+        run: flutter pub get
+
+      - name: Instalar Ferramenta create-dmg
+        run: brew install create-dmg
+
+      - name: Build para macOS
+        run: flutter build macos --release
+
+      - name: Criar imagem DMG para macOS
+        run: |
+          create-dmg \
+            --volname "Ludivex Installer" \
+            --volicon "macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_1024.png" \
+            --window-pos 200 120 \
+            --window-size 800 400 \
+            --icon-size 100 \
+            --icon "Ludivex.app" 200 190 \
+            --hide-extension "Ludivex.app" \
+            --app-drop-link 600 190 \
+            "Ludivex.dmg" \
+            "build/macos/Build/Products/Release/Ludivex.app" || true
+
+      - name: Build para iOS (Sem assinatura)
+        run: flutter build ios --release --no-codesign
+
+      - name: Empacotar estrutura Payload para gerar .IPA
+        run: |
+          mkdir -p Payload
+          cp -r build/ios/iphoneos/Runner.app Payload/Ludivex.app
+          zip -r Ludivex.ipa Payload
+
+      - name: Upload dos Artefatos Apple
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ludivex-Apple
+          path: |
+            Ludivex.dmg
+            Ludivex.ipa
+
+  # ------------------------------------------------------
+  # 4. Linux (.deb)
+  # ------------------------------------------------------
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Instalar dependências do Linux
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-12-dev
+          flutter pub get
+
+      - name: Build para Linux
+        run: flutter build linux --release
+
+      - name: Gerar pacote DEB
+        run: |
+          version=$(awk '/^version:/ {print $2}' pubspec.yaml)
+          arch=$(dpkg --print-architecture)
+          bundle="build/linux/x64/release/bundle"
+          package="build/deb"
+
+          install -d "$package"/{DEBIAN,opt/ludivex,usr/bin,usr/share}
+          cp -a "$bundle"/{ludivex,lib,data} "$package/opt/ludivex/"
+          cp -a "$bundle/share/." "$package/usr/share/"
+          ln -s /opt/ludivex/ludivex "$package/usr/bin/ludivex"
+
+          cat > "$package/DEBIAN/control" <<EOF
+          Package: ludivex
+          Version: $version
+          Architecture: $arch
+          Maintainer: Ludivex <aldobarduconeto@users.noreply.github.com>
+          Depends: libgtk-3-0, libstdc++6
+          Section: games
+          Priority: optional
+          Description: Ludivex game library and deals
+          EOF
+
+          dpkg-deb --root-owner-group --build "$package" Ludivex.deb
+
+      - name: Upload do pacote DEB
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ludivex-Linux
+          path: Ludivex.deb
+          if-no-files-found: error
+
+  # ------------------------------------------------------
+  # 5. Publicação na Release
+  # ------------------------------------------------------
+  publish-release:
+    needs: [build-ubuntu, build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Baixar todos os artefatos
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Organizar arquivos com nome Ludivex
+        run: |
+          mkdir -p release_assets
+          cp artifacts/Ludivex-Android/Ludivex.apk release_assets/Ludivex.apk || true
+          cp artifacts/Ludivex-Windows-Setup/Ludivex-Setup.exe release_assets/Ludivex-Setup.exe || true
+          cp artifacts/Ludivex-Apple/Ludivex.dmg release_assets/Ludivex.dmg || true
+          cp artifacts/Ludivex-Apple/Ludivex.ipa release_assets/Ludivex.ipa || true
+          cp artifacts/Ludivex-Linux/Ludivex.deb release_assets/Ludivex.deb
+
+      - name: Criar GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Release ${{ github.ref_name }}"
+          files: release_assets/*
+          generate_release_notes: true
+          overwrite: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

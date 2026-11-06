@@ -1,0 +1,58 @@
+name: ludivex
+description: "All your games. One place."
+publish_to: "none"
+version: 1.1.0+1
+
+environment:
+  sdk: ">=3.13.0 <4.0.0"
+  flutter: ">=3.47.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.6.0
+  html: ^0.15.6
+  intl: ^0.20.3
+  url_launcher: ^6.3.1
+  shared_preferences: ^2.5.6
+  shared_preferences_android: ^2.5.3
+  flutter_local_notifications: ^22.3.2
+
+dev_dependencies:
+  flutter_launcher_icons: ^0.14.4
+  flutter_test:
+    sdk: flutter
+  shared_preferences_platform_interface: ^2.4.2
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/branding/app_icon.png
+    - assets/fonts/roboto_license.txt
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/roboto-regular.ttf
+          weight: 400
+        - asset: assets/fonts/roboto-medium.ttf
+          weight: 500
+        - asset: assets/fonts/roboto-bold.ttf
+          weight: 700
+        - asset: assets/fonts/roboto-black.ttf
+          weight: 900
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/branding/app_icon.png
+  remove_alpha_ios: true
+  adaptive_icon_background: '#101e2b'
+  adaptive_icon_foreground: assets/branding/app_icon.png
+  adaptive_icon_foreground_inset: 16
+  windows:
+    generate: true
+    image_path: assets/branding/app_icon.png
+    icon_size: 256
+  macos:
+    generate: true
+    image_path: assets/branding/app_icon.png
