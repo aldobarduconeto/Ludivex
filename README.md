@@ -2,6 +2,29 @@
 
 Ofertas de **Steam, Epic Games Store, Xbox, PlayStation, Nuuvem, Ubisoft Store e EA Store**, lista de desejos e biblioteca para iniciar jogos instalados. No Android, o GameHub reúne os jogos do celular e as promoções de PC e consoles. Isso não executa jogos de PC ou console no telefone e não altera o aplicativo de tela inicial do Android. As requisições HTTP são feitas diretamente às fontes das lojas. Não há servidor próprio, backend separado, banco externo ou sincronização remota.
 
+## Capturas de tela
+
+As imagens mostram a interface do Ludivex em layout desktop, no tema escuro. Jogos e preços são fictícios.
+
+### Descobrir
+
+A página reúne promoções de PC e consoles. Use a busca para encontrar um título entre as ofertas carregadas, selecione uma loja ou aplique um filtro rápido de preço ou desconto.
+
+![Tela Descobrir com menu lateral, filtros de loja e cartões de promoções de exemplo](docs/screenshots/descobrir.png)
+
+### Biblioteca
+
+A coleção local reúne jogos de diferentes plataformas. Busque pelo nome, filtre pela origem ou use o botão **Jogar** para abrir um título cadastrado.
+
+![Tela Biblioteca com busca, filtros por plataforma e jogos de exemplo](docs/screenshots/biblioteca.png)
+
+### Lista de desejos
+
+Os jogos salvos ficam reunidos por título e loja. Abra o acompanhamento de um jogo para definir um preço desejado e ajustar seus avisos.
+
+![Tela Lista de desejos com jogos salvos e preços de exemplo](docs/screenshots/lista-de-desejos.png)
+
+
 ## Executar
 
 Use o Flutter instalado (as dependências atuais do lockfile requerem Flutter 3.47 / Dart 3.13 ou superior):
