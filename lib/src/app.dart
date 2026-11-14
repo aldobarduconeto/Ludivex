@@ -30,6 +30,9 @@ import 'views/widgets/app_sidebar.dart';
 import 'views/widgets/discovery_hero.dart';
 import 'views/widgets/app_theme.dart';
 import 'views/widgets/welcome_dialog.dart';
+import 'views/widgets/desktop_top_bar.dart';
+import 'views/widgets/game_roulette_dialog.dart';
+import 'views/store_screen.dart';
 
 class App extends StatefulWidget {
   const App({super.key, this.api, this.wishlist, this.backgroundSync = true});
@@ -48,6 +51,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
   List<GameDeal> _deals = [];
   bool _loading = false, _foreground = true;
   bool _overlayOpen = false;
+  bool _desktopRouteOpen = false;
   bool _loadingMore = false;
   late int _displayPageSize, _visibleLimit;
   List<GameDeal>? _filteredInput;
@@ -63,12 +67,28 @@ class _AppState extends State<App> with WidgetsBindingObserver {
   String? _activeSearchTag;
 
   static const _quickSearchTags = [
-    (id: 'free', label: '🎁 100% Grátis', hint: 'Jogos 100% gratuitos e resgates'),
-    (id: 'discount_80', label: '🔥 80%+ OFF', hint: 'Descontos massivos a partir de 80%'),
-    (id: 'under_10', label: r'⚡ Menos de R$ 10', hint: 'Super ofertas até 10 reais'),
+    (
+      id: 'free',
+      label: '🎁 100% Grátis',
+      hint: 'Jogos 100% gratuitos e resgates',
+    ),
+    (
+      id: 'discount_80',
+      label: '🔥 80%+ OFF',
+      hint: 'Descontos massivos a partir de 80%',
+    ),
+    (
+      id: 'under_10',
+      label: r'⚡ Menos de R$ 10',
+      hint: 'Super ofertas até 10 reais',
+    ),
     (id: 'under_25', label: r'🏷️ Menos de R$ 25', hint: 'Jogos até 25 reais'),
     (id: 'under_50', label: r'💎 Menos de R$ 50', hint: 'Jogos até 50 reais'),
-    (id: 'pc', label: '💻 Lojas de PC', hint: 'Steam, Epic, Nuuvem, EA, Ubisoft'),
+    (
+      id: 'pc',
+      label: '💻 Lojas de PC',
+      hint: 'Steam, Epic, Nuuvem, EA, Ubisoft',
+    ),
     (id: 'consoles', label: '🎯 Consoles', hint: 'PlayStation e Xbox'),
   ];
   Timer? _debounce, _timer;
@@ -187,8 +207,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
     } catch (_) {
       if (mounted)
         setState(
-          () => _error =
-              'A coleta foi pausada e será tentada novamente. As ofertas carregadas foram mantidas.',
+          () => _error = 'A coleta foi pausada e será tentada novamente. As ofertas carregadas foram mantidas.',
         );
     } finally {
       if (mounted) {
@@ -240,7 +259,9 @@ class _AppState extends State<App> with WidgetsBindingObserver {
         final key = 'deals.active_promotions.v1.$region.${platform.key}';
         final active = {
           for (final deal in freshDeals)
-            if (deal.platform == platform && deal.discount > 0 && !deal.isExpired)
+            if (deal.platform == platform &&
+                deal.discount > 0 &&
+                !deal.isExpired)
               deal.id: deal,
         };
         final previous = await storage.getStringList(key);
@@ -300,7 +321,8 @@ class _AppState extends State<App> with WidgetsBindingObserver {
       await _wishlist.refresh(
         _api,
         knownQuotes: _api.freshDeals,
-        notifications: _prefs.permissionsRequested && _prefs.notificationsEnabled,
+        notifications:
+            _prefs.permissionsRequested && _prefs.notificationsEnabled,
         minimumDiscount: _prefs.alertMinimumDiscount,
         onAlert: (deal) => NotificationService.instance.showWishlistDeal(
           deal,
@@ -310,8 +332,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
     } catch (_) {
       if (mounted && generation == _requestId)
         setState(
-          () => _error =
-              'Não foi possível atualizar. Seus jogos salvos foram preservados.',
+          () => _error = 'Não foi possível atualizar. Seus jogos salvos foram preservados.',
         );
     } finally {
       if (mounted && generation == _requestId) {
@@ -497,16 +518,6 @@ class _AppState extends State<App> with WidgetsBindingObserver {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'SEU ESPAÇO PARA JOGAR MAIS',
-                style: TextStyle(
-                  fontSize: 9,
-                  letterSpacing: 1.7,
-                  fontWeight: FontWeight.w700,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 5),
-              Text(
                 _tab == 0
                     ? 'Descobrir'
                     : _tab == 1
@@ -548,6 +559,49 @@ class _AppState extends State<App> with WidgetsBindingObserver {
     theme: _lightTheme,
     darkTheme: _activeDarkTheme,
     themeMode: _prefs.themeMode,
+    builder: (context, child) {
+      if (!hasDesktopTopBar || child == null) return child ?? const SizedBox();
+      final library = LibraryService.instance;
+      return NotificationListener<NavigationNotification>(
+        onNotification: (notification) {
+          final routeOpen = _navigator.currentState?.canPop() ?? false;
+          if (_desktopRouteOpen != routeOpen) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) setState(() => _desktopRouteOpen = routeOpen);
+            });
+          }
+          return false;
+        },
+        child: ListenableBuilder(
+          listenable: library,
+          builder: (context, _) => DesktopTopBar(
+            onStores: _desktopRouteOpen
+                ? null
+                : () {
+                    final navigator = _navigator.currentState;
+                    if (navigator == null || navigator.canPop()) return;
+                    navigator.push<void>(
+                      MaterialPageRoute(
+                        builder: (_) => StoreScreen(library: library),
+                      ),
+                    );
+                  },
+            onRandomGame: _desktopRouteOpen || library.items.isEmpty
+                ? null
+                : () {
+                    final navigator = _navigator.currentState;
+                    if (navigator == null || navigator.canPop()) return;
+                    GameRouletteDialog.show(
+                      navigator.overlay!.context,
+                      library.items,
+                    );
+                  },
+            onRefresh: _loading ? null : () => _refresh(force: true),
+            child: child,
+          ),
+        ),
+      );
+    },
     home: Builder(
       builder: (context) => LayoutBuilder(
         builder: (context, constraints) {
@@ -645,6 +699,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
                                   ),
                                   LibraryScreen(
                                     service: LibraryService.instance,
+                                    active: _tab == 3,
                                   ),
                                   DevicesScreen(
                                     service: DeviceService.instance,
@@ -754,16 +809,20 @@ class _AppState extends State<App> with WidgetsBindingObserver {
             if (d.discount < 80) return false;
             break;
           case 'under_10':
-            if (d.isFree || d.currentPrice > 10.0 || d.currentPrice <= 0) return false;
+            if (d.isFree || d.currentPrice > 10.0 || d.currentPrice <= 0)
+              return false;
             break;
           case 'under_25':
-            if (d.isFree || d.currentPrice > 25.0 || d.currentPrice <= 0) return false;
+            if (d.isFree || d.currentPrice > 25.0 || d.currentPrice <= 0)
+              return false;
             break;
           case 'under_50':
-            if (d.isFree || d.currentPrice > 50.0 || d.currentPrice <= 0) return false;
+            if (d.isFree || d.currentPrice > 50.0 || d.currentPrice <= 0)
+              return false;
             break;
           case 'pc':
-            final isPc = d.platform == GamePlatform.steam ||
+            final isPc =
+                d.platform == GamePlatform.steam ||
                 d.platform == GamePlatform.epic ||
                 d.platform == GamePlatform.nuuvem ||
                 d.platform == GamePlatform.ubisoft ||
@@ -771,7 +830,8 @@ class _AppState extends State<App> with WidgetsBindingObserver {
             if (!isPc) return false;
             break;
           case 'consoles':
-            final isConsole = d.platform == GamePlatform.playstation ||
+            final isConsole =
+                d.platform == GamePlatform.playstation ||
                 d.platform == GamePlatform.xbox ||
                 d.platform == GamePlatform.nintendo;
             if (!isConsole) return false;
@@ -874,24 +934,10 @@ class _AppState extends State<App> with WidgetsBindingObserver {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'Em destaque',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    '${_prefs.platforms.length} lojas',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
+              hero,
+              const SizedBox(height: 20),
+              Text('Campanhas', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 10),
               SizedBox(
                 height: 164 * scale,
                 child: ListView.separated(
@@ -1079,18 +1125,25 @@ class _AppState extends State<App> with WidgetsBindingObserver {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               selectedColor: tag.id == 'free'
-                                  ? const Color(0xFF20B969).withValues(alpha: 0.22)
+                                  ? const Color(0xFF20B969)
+                                        .withValues(alpha: 0.22)
                                   : tag.id == 'discount_80'
-                                      ? Colors.redAccent.withValues(alpha: 0.22)
-                                      : Theme.of(context).colorScheme.primary.withValues(alpha: 0.18),
+                                  ? Colors.redAccent.withValues(alpha: 0.22)
+                                  : Theme.of(context).colorScheme.primary
+                                        .withValues(alpha: 0.18),
                               side: BorderSide(
                                 color: _activeSearchTag == tag.id
                                     ? (tag.id == 'free'
-                                        ? const Color(0xFF20B969)
-                                        : tag.id == 'discount_80'
-                                            ? Colors.redAccent
-                                            : Theme.of(context).colorScheme.primary)
-                                    : Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.4),
+                                          ? const Color(0xFF20B969)
+                                          : tag.id == 'discount_80'
+                                          ? Colors.redAccent
+                                          : Theme.of(context)
+                                                .colorScheme
+                                                .primary)
+                                    : Theme.of(context)
+                                          .colorScheme
+                                          .outlineVariant
+                                          .withValues(alpha: 0.4),
                                 width: _activeSearchTag == tag.id ? 1.4 : 0.8,
                               ),
                               onSelected: (selected) {
@@ -1104,9 +1157,12 @@ class _AppState extends State<App> with WidgetsBindingObserver {
                           TextButton.icon(
                             style: TextButton.styleFrom(
                               visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
                             ),
-                            onPressed: () => setState(() => _activeSearchTag = null),
+                            onPressed: () =>
+                                setState(() => _activeSearchTag = null),
                             icon: const Icon(Icons.close_rounded, size: 14),
                             label: const Text(
                               'Limpar tag',

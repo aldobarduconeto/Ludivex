@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../models/library_game.dart';
 import '../services/library_service.dart';
+import '../services/account_library.dart';
+import '../services/desktop_store.dart';
+import 'store_screen.dart';
 import '../services/local_game_launcher.dart';
 import '../services/game_scanner.dart';
 import '../services/game_scan_result.dart';
@@ -13,18 +16,41 @@ import 'widgets/game_roulette_dialog.dart';
 import 'package:flutter/foundation.dart';
 
 class LibraryScreen extends StatefulWidget {
-  const LibraryScreen({super.key, required this.service, this.scanner});
+  const LibraryScreen({
+    super.key,
+    required this.service,
+    this.scanner,
+    this.active = true,
+  });
   final LibraryService service;
+  final bool active;
   final Future<GameScanResult> Function({String? steamFolder})? scanner;
 
   @override
   State<LibraryScreen> createState() => _LibraryScreenState();
 }
 
+enum _LibraryFilter { all, favorites, recent, installed, available }
+
+enum _LibrarySort {
+  title('Nome (A–Z)'),
+  reverseTitle('Nome (Z–A)'),
+  store('Loja'),
+  recent('Última inicialização');
+
+  const _LibrarySort(this.label);
+  final String label;
+}
+
 class _LibraryScreenState extends State<LibraryScreen>
     with WidgetsBindingObserver {
   String _query = '';
   String? _source;
+  _LibraryFilter _filter = _LibraryFilter.all;
+  _LibrarySort? _sort;
+  bool _listView = false;
+  final _accounts = AccountLibrary.instance;
+  bool _requestedAccounts = false;
   final _launching = <String>{};
   final _scanFolder = TextEditingController();
   final _searchController = TextEditingController();
@@ -40,8 +66,48 @@ class _LibraryScreenState extends State<LibraryScreen>
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && MobileGameLauncher.supported) _scan(automatic: true);
+      if (mounted) _loadAccountsOnEntry();
     });
   }
+
+  @override
+  void didUpdateWidget(covariant LibraryScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active && !oldWidget.active) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _loadAccountsOnEntry();
+      });
+    }
+  }
+
+  void _loadAccountsOnEntry() {
+    if (widget.active && supportsStoreAccounts && !_requestedAccounts) {
+      _requestedAccounts = true;
+      _refreshAccounts(automatic: true);
+    }
+  }
+
+  Future<void> _refreshAccounts({bool automatic = false}) async {
+    try {
+      final failures = await _accounts.refresh();
+      if (automatic || !mounted) return;
+      _message(
+        failures.isEmpty
+            ? 'Bibliotecas das lojas atualizadas.'
+            : 'Sem atualização para ${failures.map((store) => store.label).join(', ')}. Confira as conexões em Lojas e compatibilidade.',
+      );
+    } catch (_) {
+      if (!automatic) _message('Não foi possível atualizar as lojas.');
+    }
+  }
+
+  Future<void> _openStore(StoreProvider provider) =>
+      Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) =>
+              StoreScreen(library: widget.service, initialProvider: provider),
+        ),
+      );
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -204,11 +270,15 @@ class _LibraryScreenState extends State<LibraryScreen>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
-  Future<void> _launch(LibraryGame game) async {
+  Future<void> _launch(LibraryGame game, {bool fromAccount = false}) async {
+    if (_launching.contains(game.id)) return;
     setState(() => _launching.add(game.id));
     try {
-      await widget.service.launch(game);
-      _message('Inicialização solicitada para ${game.title}.');
+      if (fromAccount) await widget.service.importGames([game]);
+      final recorded = await widget.service.launch(game);
+      _message(
+        recorded ? 'Inicialização solicitada para ${game.title}.' : 'Inicialização solicitada. Não foi possível atualizar o histórico.',
+      );
     } catch (_) {
       _message(
         'Não foi possível iniciar ${game.title}. Confira o destino e se o jogo e o launcher estão instalados neste dispositivo.',
@@ -217,6 +287,115 @@ class _LibraryScreenState extends State<LibraryScreen>
       if (mounted) setState(() => _launching.remove(game.id));
     }
   }
+
+  Future<void> _toggleFavorite(LibraryGame game) async {
+    try {
+      if (!widget.service.items.any((item) => item.id == game.id)) {
+        await widget.service.importGames([game]);
+      }
+      await widget.service.setFavorite(game.id, !game.favorite);
+    } catch (_) {
+      _message('Não foi possível atualizar os favoritos.');
+    }
+  }
+
+  String? _unavailableLabel(LibraryGame game) {
+    if (LibraryGame.storeTarget(game.target) != null &&
+        !supportsStoreAccounts) {
+      return 'Disponível no computador';
+    }
+    if (LibraryGame.androidPackage(game.target) != null &&
+        !MobileGameLauncher.supported) {
+      return 'Disponível no Android';
+    }
+    if ((game.local && !supportsLocalGames) ||
+        (LibraryGame.isWindowsAppTarget(game.target) && !supportsWindowsApps)) {
+      return 'Disponível no computador';
+    }
+    return null;
+  }
+
+  Future<void> _details(
+    LibraryGame game, {
+    AccountGame? account,
+    bool saved = true,
+  }) => showDialog<void>(
+    context: context,
+    builder: (dialogContext) {
+      final lastLaunch = game.lastLaunchedAt?.toLocal();
+      final localization = MaterialLocalizations.of(dialogContext);
+      final unavailable = _unavailableLabel(game);
+      return AlertDialog(
+        title: Text(game.title),
+        content: SizedBox(
+          width: 480,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(game.source),
+                if (account != null)
+                  Text(
+                    account.game.installed
+                        ? 'Instalado'
+                        : 'Disponível para instalar',
+                  ),
+                const SizedBox(height: 16),
+                const Text('Destino de inicialização'),
+                SelectableText(game.target),
+                const SizedBox(height: 16),
+                const Text('Última solicitação de inicialização'),
+                Text(
+                  lastLaunch == null
+                      ? 'Nenhuma registrada'
+                      : '${localization.formatShortDate(lastLaunch)} · '
+                            '${localization.formatTimeOfDay(TimeOfDay.fromDateTime(lastLaunch))}',
+                ),
+                if (unavailable != null) Text(unavailable),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Fechar'),
+          ),
+          if (saved)
+            OutlinedButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _edit(game);
+              },
+              child: const Text('Editar'),
+            ),
+          FilledButton.icon(
+            onPressed: unavailable != null || _launching.contains(game.id)
+                ? null
+                : () {
+                    Navigator.pop(dialogContext);
+                    if (account != null && !account.game.installed) {
+                      _openStore(account.store);
+                    } else {
+                      _launch(game, fromAccount: !saved);
+                    }
+                  },
+            icon: Icon(
+              account != null && !account.game.installed
+                  ? Icons.download_rounded
+                  : Icons.play_arrow_rounded,
+            ),
+            label: Text(
+              account != null && !account.game.installed
+                  ? 'Ver instalação'
+                  : 'Jogar',
+            ),
+          ),
+        ],
+      );
+    },
+  );
 
   Future<void> _edit([LibraryGame? game]) => showDialog<void>(
     context: context,
@@ -249,9 +428,34 @@ class _LibraryScreenState extends State<LibraryScreen>
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: widget.service,
+    animation: Listenable.merge([widget.service, _accounts]),
     builder: (context, _) {
-      final all = widget.service.items;
+      final accounts = {
+        if (supportsStoreAccounts)
+          for (final entry in _accounts.games)
+            entry.store.target(entry.game.id): entry,
+      };
+      final saved = {
+        for (final game in widget.service.items) game.target: game,
+      };
+      final playable = widget.service.items
+          .where(
+            (game) =>
+                accounts[game.target]?.game.installed != false &&
+                _unavailableLabel(game) == null,
+          )
+          .toList();
+      final all = [
+        ...widget.service.items,
+        for (final entry in accounts.entries)
+          if (!saved.containsKey(entry.key))
+            LibraryGame(
+              id: entry.key,
+              title: entry.value.game.title,
+              source: entry.value.store.label,
+              target: entry.key,
+            ),
+      ]..sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
       final mobileGames = _mobileScan == null
           ? const <LibraryGame>[]
           : _newGames(_mobileScan!);
@@ -261,9 +465,59 @@ class _LibraryScreenState extends State<LibraryScreen>
           .where(
             (g) =>
                 (active == null || g.source == active) &&
-                g.title.toLowerCase().contains(_query),
+                g.title.toLowerCase().contains(_query) &&
+                switch (_filter) {
+                  _LibraryFilter.all => true,
+                  _LibraryFilter.favorites => g.favorite,
+                  _LibraryFilter.recent => g.lastLaunchedAt != null,
+                  _LibraryFilter.installed =>
+                    accounts[g.target]?.game.installed ?? false,
+                  _LibraryFilter.available =>
+                    accounts[g.target]?.game.installed == false,
+                },
           )
           .toList();
+      final sort =
+          _sort ??
+          (_filter == _LibraryFilter.recent
+              ? _LibrarySort.recent
+              : _LibrarySort.title);
+      games.sort((a, b) {
+        final byTitle = a.title.toLowerCase().compareTo(b.title.toLowerCase());
+        final byStore = a.source.toLowerCase().compareTo(
+          b.source.toLowerCase(),
+        );
+        final byRecent = (b.lastLaunchedAt?.millisecondsSinceEpoch ?? 0)
+            .compareTo(a.lastLaunchedAt?.millisecondsSinceEpoch ?? 0);
+        return switch (sort) {
+          _LibrarySort.title => byTitle,
+          _LibrarySort.reverseTitle => -byTitle,
+          _LibrarySort.store => byStore == 0 ? byTitle : byStore,
+          _LibrarySort.recent => byRecent == 0 ? byTitle : byRecent,
+        };
+      });
+      Widget gameTile(BuildContext context, int index) {
+        final game = games[index];
+        final account = accounts[game.target];
+        final isSaved = saved.containsKey(game.target);
+        final install = account?.game.installed == false;
+        return LibraryGameCard(
+          key: ValueKey(game.id),
+          game: game,
+          compact: _listView,
+          busy: _launching.contains(game.id),
+          unavailableLabel: _unavailableLabel(game),
+          installAction: install,
+          onPlay: () => install
+              ? _openStore(account!.store)
+              : _launch(game, fromAccount: !isSaved),
+          onDetails: () => _details(game, account: account, saved: isSaved),
+          onFavorite: () => _toggleFavorite(game),
+          onEdit: isSaved ? () => _edit(game) : null,
+          onRemove: isSaved ? () => _remove(game) : null,
+        );
+      }
+
       return CustomScrollView(
         key: const PageStorageKey('library'),
         slivers: [
@@ -273,33 +527,49 @@ class _LibraryScreenState extends State<LibraryScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  PageIntro(
-                    eyebrow: 'SUA COLEÇÃO',
-                    title: 'Seus jogos. Um só lugar.',
-                    description: 'Do celular ao computador, reúna suas bibliotecas e escolha sua próxima partida.',
-                    icon: Icons.sports_esports_rounded,
-                    metrics: [
-                      MetricPill(
-                        icon: Icons.grid_view_rounded,
-                        label: '${all.length} jogos',
-                      ),
-                      MetricPill(
-                        icon: Icons.hub_outlined,
-                        label: '${sources.length} plataformas',
-                      ),
-                    ],
-                    actions: [
+                  Text(
+                    'Biblioteca de jogos',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (supportsStoreAccounts)
+                        OutlinedButton.icon(
+                          onPressed: _accounts.loading
+                              ? null
+                              : _refreshAccounts,
+                          icon: const Icon(Icons.sync_rounded),
+                          label: Text(
+                            _accounts.loading
+                                ? 'Atualizando lojas…'
+                                : 'Atualizar jogos das contas',
+                          ),
+                        ),
+                      if (supportsStoreAccounts)
+                        OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push<void>(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  StoreScreen(library: widget.service),
+                            ),
+                          ),
+                          icon: const Icon(Icons.storefront_outlined),
+                          label: const Text('Lojas e compatibilidade'),
+                        ),
                       FilledButton.icon(
                         onPressed: () => _edit(),
                         icon: const Icon(Icons.add),
-                        label: const Text('Adicionar à biblioteca'),
+                        label: const Text('Adicionar jogo'),
                       ),
                       FilledButton.tonalIcon(
-                        onPressed: all.isEmpty
+                        onPressed: playable.isEmpty
                             ? null
-                            : () => GameRouletteDialog.show(context, all),
+                            : () => GameRouletteDialog.show(context, playable),
                         icon: const Icon(Icons.casino_rounded),
-                        label: const Text('O que jogar hoje? 🎲'),
+                        label: const Text('Sortear jogo'),
                       ),
                       if (supportsGameScan || MobileGameLauncher.supported)
                         OutlinedButton.icon(
@@ -318,7 +588,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                                 ? 'Buscando jogos…'
                                 : MobileGameLauncher.supported
                                 ? 'Adicionar jogos do celular'
-                                : 'Buscar jogos instalados',
+                                : 'Importar jogos instalados',
                           ),
                         ),
                     ],
@@ -365,38 +635,111 @@ class _LibraryScreenState extends State<LibraryScreen>
                         'No iPhone, adicione jogos por um link de abertura compatível fornecido pelo jogo. O iOS não permite listar todos os aplicativos instalados.',
                       ),
                     ),
-                  CollectionSearchField(
-                    controller: _searchController,
-                    hint: 'Buscar na biblioteca',
-                    onChanged: (value) =>
-                        setState(() => _query = value.trim().toLowerCase()),
-                  ),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      ChoiceChip(
-                        label: const Text('Todas'),
-                        selected: active == null,
-                        onSelected: (_) => setState(() => _source = null),
-                      ),
-                      for (final source in sources)
-                        ChoiceChip(
-                          label: Text(source),
-                          selected: source == active,
-                          onSelected: (_) => setState(() => _source = source),
-                        ),
-                    ],
-                  ),
-                  if (_query.isNotEmpty || active != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: Text(
-                        '${games.length} de ${all.length} jogos',
-                        style: Theme.of(context).textTheme.bodySmall,
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CollectionSearchField(
+                            controller: _searchController,
+                            hint: 'Buscar na biblioteca',
+                            onChanged: (value) => setState(
+                              () => _query = value.trim().toLowerCase(),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final (filter, label) in const [
+                                (_LibraryFilter.all, 'Todos os jogos'),
+                                (_LibraryFilter.favorites, 'Favoritos'),
+                                (_LibraryFilter.recent, 'Recentes'),
+                                if (supportsStoreAccounts) ...[
+                                  (
+                                    _LibraryFilter.installed,
+                                    'Instalados pelas lojas',
+                                  ),
+                                  (_LibraryFilter.available, 'Para instalar'),
+                                ],
+                              ])
+                                ChoiceChip(
+                                  label: Text(label),
+                                  selected: _filter == filter,
+                                  onSelected: (_) =>
+                                      setState(() => _filter = filter),
+                                ),
+                            ],
+                          ),
+                          if (sources.isNotEmpty) const SizedBox(height: 8),
+                          if (sources.isNotEmpty)
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                ChoiceChip(
+                                  label: const Text('Todas as plataformas'),
+                                  selected: active == null,
+                                  onSelected: (_) =>
+                                      setState(() => _source = null),
+                                ),
+                                for (final source in sources)
+                                  ChoiceChip(
+                                    label: Text(source),
+                                    selected: source == active,
+                                    onSelected: (_) =>
+                                        setState(() => _source = source),
+                                  ),
+                              ],
+                            ),
+                          if (all.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 12),
+                              child: Wrap(
+                                spacing: 12,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  Text(
+                                    '${games.length} de ${all.length} jogos',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall,
+                                  ),
+                                  PopupMenuButton<_LibrarySort>(
+                                    tooltip: 'Ordenar jogos',
+                                    initialValue: sort,
+                                    onSelected: (value) =>
+                                        setState(() => _sort = value),
+                                    itemBuilder: (_) => [
+                                      for (final option in _LibrarySort.values)
+                                        PopupMenuItem(
+                                          value: option,
+                                          child: Text(option.label),
+                                        ),
+                                    ],
+                                    icon: const Icon(Icons.sort_rounded),
+                                  ),
+                                  IconButton(
+                                    tooltip: _listView
+                                        ? 'Exibir grade'
+                                        : 'Exibir lista',
+                                    onPressed: () =>
+                                        setState(() => _listView = !_listView),
+                                    icon: Icon(
+                                      _listView
+                                          ? Icons.grid_view_rounded
+                                          : Icons.view_list_rounded,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
                       ),
                     ),
+                  ),
                 ],
               ),
             ),
@@ -416,58 +759,42 @@ class _LibraryScreenState extends State<LibraryScreen>
                       ? MobileGameLauncher.supported
                             ? 'Encontre os jogos instalados no celular e escolha quais adicionar à sua coleção.'
                             : 'Adicione seus jogos ou busque instalações neste dispositivo para começar.'
-                      : 'Tente outro nome ou escolha uma plataforma diferente.',
+                      : 'Experimente outra busca, plataforma ou filtro.',
                 ),
               ),
             )
           else
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
-              sliver: SliverLayoutBuilder(
-                builder: (context, constraints) {
-                  final columns = (constraints.crossAxisExtent / 300)
-                      .floor()
-                      .clamp(1, 4);
-                  return SliverGrid.builder(
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: columns,
-                      mainAxisExtent:
-                          290 +
-                          (MediaQuery.textScalerOf(context).scale(1) - 1).clamp(
-                                0,
-                                3,
-                              ) *
-                              130,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
+              sliver: _listView
+                  ? SliverList.separated(
+                      itemCount: games.length,
+                      itemBuilder: gameTile,
+                      separatorBuilder: (_, _) => const SizedBox(height: 8),
+                    )
+                  : SliverLayoutBuilder(
+                      builder: (context, constraints) {
+                        final columns = (constraints.crossAxisExtent / 300)
+                            .floor()
+                            .clamp(1, 4);
+                        return SliverGrid.builder(
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: columns,
+                                mainAxisExtent:
+                                    290 +
+                                    (MediaQuery.textScalerOf(context).scale(1) -
+                                                1)
+                                            .clamp(0, 3) *
+                                        130,
+                                mainAxisSpacing: 16,
+                                crossAxisSpacing: 16,
+                              ),
+                          itemCount: games.length,
+                          itemBuilder: gameTile,
+                        );
+                      },
                     ),
-                    itemCount: games.length,
-                    itemBuilder: (context, index) {
-                      final game = games[index];
-                      final busy = _launching.contains(game.id);
-                      final unavailable =
-                          (LibraryGame.androidPackage(game.target) != null &&
-                              !MobileGameLauncher.supported) ||
-                          (game.local && !supportsLocalGames) ||
-                          (LibraryGame.isWindowsAppTarget(game.target) &&
-                              !supportsWindowsApps);
-                      return LibraryGameCard(
-                        key: ValueKey(game.id),
-                        game: game,
-                        busy: busy,
-                        unavailableLabel: unavailable
-                            ? LibraryGame.androidPackage(game.target) != null
-                                  ? 'Disponível no Android'
-                                  : 'Disponível no computador'
-                            : null,
-                        onPlay: () => _launch(game),
-                        onEdit: () => _edit(game),
-                        onRemove: () => _remove(game),
-                      );
-                    },
-                  );
-                },
-              ),
             ),
         ],
       );
@@ -696,6 +1023,7 @@ class _LibraryGameDialogState extends State<_LibraryGameDialog> {
           target: _target.text.trim(),
           local: _local,
         ),
+        preserveActivity: widget.game != null,
       );
       if (mounted) Navigator.of(context).pop();
     } catch (_) {

@@ -34,7 +34,9 @@ class AppSidebar extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Material(
-        color: selected ? c.primary.withValues(alpha: 0.12) : Colors.transparent,
+        color: selected
+            ? c.primary.withValues(alpha: 0.12)
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
@@ -115,7 +117,9 @@ class AppSidebar extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Material(
-        color: selected ? store.tint.withValues(alpha: 0.12) : Colors.transparent,
+        color: selected
+            ? store.tint.withValues(alpha: 0.12)
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(10),
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
@@ -140,11 +144,7 @@ class AppSidebar extends StatelessWidget {
                     color: store.tint.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(7),
                   ),
-                  child: Icon(
-                    store.icon,
-                    size: 14,
-                    color: store.tint,
-                  ),
+                  child: Icon(store.icon, size: 14, color: store.tint),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -183,9 +183,7 @@ class AppSidebar extends StatelessWidget {
     return SizedBox(
       width: 256,
       child: Material(
-        color: isOled
-            ? const Color(0xFF000000)
-            : (dark ? const Color(0xFF10141A) : Colors.white),
+        color: isOled ? Colors.black : c.surface,
         child: DecoratedBox(
           decoration: BoxDecoration(
             border: Border(
@@ -224,28 +222,14 @@ class AppSidebar extends StatelessWidget {
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'ludivex',
-                              style: TextStyle(
-                                fontSize: 20,
-                                letterSpacing: -.7,
-                                fontWeight: FontWeight.w800,
-                                color: c.onSurface,
-                              ),
-                            ),
-                            Text(
-                              'ALL YOUR GAMES. ONE PLACE.',
-                              style: TextStyle(
-                                fontSize: 8,
-                                letterSpacing: .4,
-                                fontWeight: FontWeight.w700,
-                                color: c.onSurfaceVariant.withValues(alpha: 0.75),
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          'ludivex',
+                          style: TextStyle(
+                            fontSize: 20,
+                            letterSpacing: -.7,
+                            fontWeight: FontWeight.w800,
+                            color: c.onSurface,
+                          ),
                         ),
                       ),
                     ],
@@ -303,7 +287,9 @@ class AppSidebar extends StatelessWidget {
                                 fontSize: 9.5,
                                 letterSpacing: 1.6,
                                 fontWeight: FontWeight.w700,
-                                color: c.onSurfaceVariant.withValues(alpha: 0.65),
+                                color: c.onSurfaceVariant.withValues(
+                                  alpha: 0.65,
+                                ),
                               ),
                             ),
                             const Spacer(),
@@ -313,7 +299,9 @@ class AppSidebar extends StatelessWidget {
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w600,
-                                  color: c.onSurfaceVariant.withValues(alpha: 0.45),
+                                  color: c.onSurfaceVariant.withValues(
+                                    alpha: 0.45,
+                                  ),
                                 ),
                               ),
                           ],
@@ -377,7 +365,9 @@ class AppSidebar extends StatelessWidget {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: c.surfaceContainerLowest.withValues(alpha: 0.6),
+                          color: c.surfaceContainerLowest.withValues(
+                            alpha: 0.6,
+                          ),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
                             color: c.outlineVariant.withValues(alpha: 0.2),
@@ -397,7 +387,9 @@ class AppSidebar extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w500,
-                                color: c.onSurfaceVariant.withValues(alpha: 0.7),
+                                color: c.onSurfaceVariant.withValues(
+                                  alpha: 0.7,
+                                ),
                               ),
                             ),
                           ],

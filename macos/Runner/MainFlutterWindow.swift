@@ -4,6 +4,15 @@ import IOBluetooth
 
 class MainFlutterWindow: NSWindow {
   private var deviceChannel: FlutterMethodChannel?
+  private var windowChannel: FlutterMethodChannel?
+  private var dragEvent: NSEvent?
+
+  override func sendEvent(_ event: NSEvent) {
+    if event.type == .leftMouseDown { dragEvent = event }
+    if event.type == .leftMouseUp { dragEvent = nil }
+    super.sendEvent(event)
+  }
+
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
     let windowFrame = self.frame
@@ -11,6 +20,29 @@ class MainFlutterWindow: NSWindow {
     self.setFrame(windowFrame, display: true)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
+    styleMask.insert(.fullSizeContentView)
+    titleVisibility = .hidden
+    titlebarAppearsTransparent = true
+    standardWindowButton(.closeButton)?.isHidden = true
+    standardWindowButton(.miniaturizeButton)?.isHidden = true
+    standardWindowButton(.zoomButton)?.isHidden = true
+    let controls = FlutterMethodChannel(name: "ludivex/window", binaryMessenger: flutterViewController.engine.binaryMessenger)
+    windowChannel = controls
+    controls.setMethodCallHandler { [weak self] call, result in
+      guard let self else { result(nil); return }
+      switch call.method {
+      case "minimize": self.miniaturize(nil)
+      case "maximize": self.zoom(nil)
+      case "close": self.performClose(nil)
+      case "drag":
+        if let event = self.dragEvent {
+          self.dragEvent = nil
+          self.performDrag(with: event)
+        }
+      default: result(FlutterMethodNotImplemented); return
+      }
+      result(nil)
+    }
     let channel = FlutterMethodChannel(name: "ludivex/devices", binaryMessenger: flutterViewController.engine.binaryMessenger)
     deviceChannel = channel
     channel.setMethodCallHandler { call, result in

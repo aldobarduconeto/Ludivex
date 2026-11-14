@@ -94,7 +94,6 @@ class _SaleScreenState extends State<SaleScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         PageIntro(
-                          eyebrow: widget.campaign.platform.label.toUpperCase(),
                           title: widget.campaign.title,
                           description: widget.campaign.description.isNotEmpty
                               ? widget.campaign.description

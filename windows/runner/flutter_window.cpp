@@ -1,6 +1,7 @@
 #include "flutter_window.h"
 
 #include <optional>
+#include <flutter/standard_method_codec.h>
 
 #include "flutter/generated_plugin_registrant.h"
 
@@ -25,6 +26,33 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  auto hwnd = GetHandle();
+  SetWindowLongPtr(hwnd, GWL_STYLE, GetWindowLongPtr(hwnd, GWL_STYLE) & ~WS_CAPTION);
+  SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+               SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+  window_channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+      flutter_controller_->engine()->messenger(), "ludivex/window",
+      &flutter::StandardMethodCodec::GetInstance());
+  window_channel_->SetMethodCallHandler([hwnd](const auto& call, auto result) {
+    const auto& method = call.method_name();
+    if (method == "maximize") {
+      ShowWindow(hwnd, IsZoomed(hwnd) ? SW_RESTORE : SW_MAXIMIZE);
+    } else if (method == "minimize") {
+      ShowWindow(hwnd, SW_MINIMIZE);
+    } else if (method == "close") {
+      PostMessage(hwnd, WM_CLOSE, 0, 0);
+    } else if (method == "drag") {
+      POINT cursor;
+      GetCursorPos(&cursor);
+      ReleaseCapture();
+      PostMessage(hwnd, WM_NCLBUTTONDOWN, HTCAPTION,
+                  MAKELPARAM(cursor.x, cursor.y));
+    } else {
+      result->NotImplemented();
+      return;
+    }
+    result->Success();
+  });
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -40,6 +68,7 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  window_channel_.reset();
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }

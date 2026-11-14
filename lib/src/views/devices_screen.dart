@@ -147,7 +147,6 @@ class _DevicesScreenState extends State<DevicesScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     PageIntro(
-                      eyebrow: 'SEU SETUP',
                       title: 'Prontos para a próxima partida.',
                       description: 'Controles e fones Bluetooth, modelo e bateria em um só lugar.',
                       icon: Icons.devices_other_rounded,

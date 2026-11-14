@@ -5,6 +5,7 @@ import '../services/api_transport.dart';
 import '../services/game_news_service.dart';
 import '../services/library_service.dart';
 import '../services/preferences_store.dart';
+import 'widgets/page_components.dart';
 
 typedef _NewsGame = ({String id, String title, String source, String? target});
 
@@ -199,26 +200,23 @@ class _NewsScreenState extends State<NewsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'Notícias dos jogos',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 8),
-          const Text('Selecione um jogo para ver as publicações da Steam.'),
-          const SizedBox(height: 16),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: _busy
-                  ? null
-                  : _storageError
-                  ? _loadFollowed
-                  : _addFollowed,
-              icon: Icon(_storageError ? Icons.refresh : Icons.add),
-              label: Text(
-                _storageError ? 'Recarregar jogos seguidos' : 'Seguir jogo',
+          PageIntro(
+            title: 'Notícias dos jogos',
+            description: 'Selecione um jogo para ver as publicações da Steam.',
+            icon: Icons.newspaper_outlined,
+            actions: [
+              OutlinedButton.icon(
+                onPressed: _busy
+                    ? null
+                    : _storageError
+                    ? _loadFollowed
+                    : _addFollowed,
+                icon: Icon(_storageError ? Icons.refresh : Icons.add),
+                label: Text(
+                  _storageError ? 'Recarregar jogos seguidos' : 'Seguir jogo',
+                ),
               ),
-            ),
+            ],
           ),
           if (games.isNotEmpty)
             Row(

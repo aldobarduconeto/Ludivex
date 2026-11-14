@@ -196,7 +196,6 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
               ),
               children: [
                 PageIntro(
-                  eyebrow: editing ? 'SEU ACOMPANHAMENTO' : 'EXPLORE AS LOJAS',
                   title: editing
                       ? 'Acompanhe do seu jeito.'
                       : 'Qual é o próximo jogo?',

@@ -1,9 +1,6 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../models/game_deal.dart';
-import 'page_components.dart';
 
 class DiscoveryHero extends StatelessWidget {
   const DiscoveryHero({
@@ -13,76 +10,90 @@ class DiscoveryHero extends StatelessWidget {
     required this.onExplore,
     this.featured,
   });
+
   final int offerCount, storeCount;
   final GameDeal? featured;
   final VoidCallback onExplore;
 
   @override
   Widget build(BuildContext context) {
-    final actions = [
-      FilledButton.icon(
-        onPressed: onExplore,
-        icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-        iconAlignment: IconAlignment.end,
-        label: const Text('Explorar ofertas'),
-      ),
-      if (featured != null)
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 240),
-          child: Text(
-            '${featured!.title} · ${featured!.formattedPrice}',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ),
-    ];
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
-      return LayoutBuilder(
-        builder: (context, constraints) {
-          final scale = MediaQuery.textScalerOf(context).scale(16) / 16;
-          if (constraints.maxWidth < 300 || scale > 1.25) {
-            return _flutterHero(actions);
-          }
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                height: 240 * scale,
-                child: UiKitView(
-                  key: ValueKey((offerCount, storeCount)),
-                  viewType: 'ludivex/discovery_hero',
-                  creationParams: {'offers': offerCount, 'stores': storeCount},
-                  creationParamsCodec: const StandardMessageCodec(),
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final image = featured?.imageUrl;
+    const backdrop = Color(0xFF151421);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: Stack(
+        children: [
+          const Positioned.fill(child: ColoredBox(color: backdrop)),
+          if (image != null)
+            Positioned.fill(
+              child: Image.network(
+                image,
+                fit: BoxFit.cover,
+                alignment: Alignment.centerRight,
+                cacheWidth: 1280,
+                excludeFromSemantics: true,
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              ),
+            ),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    backdrop,
+                    backdrop.withValues(alpha: image == null ? .92 : .84),
+                    const Color(0x80302A55),
+                  ],
+                  stops: const [0, .48, 1],
                 ),
               ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 12,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: actions,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 30),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 450),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    featured?.title ?? 'Ofertas de jogos',
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.headlineLarge?.copyWith(
+                      color: const Color(0xFFF8F7FF),
+                      height: 1.08,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    featured == null
+                        ? '$offerCount ofertas em $storeCount lojas'
+                        : '${featured!.formattedPrice} · $offerCount ofertas em $storeCount lojas',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: const Color(0xFFDED9EF),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  FilledButton.icon(
+                    onPressed: onExplore,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFBCACFF),
+                      foregroundColor: const Color(0xFF211743),
+                      shadowColor: colors.shadow,
+                    ),
+                    icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                    iconAlignment: IconAlignment.end,
+                    label: const Text('Explorar ofertas'),
+                  ),
+                ],
               ),
-            ],
-          );
-        },
-      );
-    }
-    return _flutterHero(actions);
-  }
-
-  Widget _flutterHero(List<Widget> actions) => PageIntro(
-    eyebrow: 'DESCOBRIR',
-    title: 'Seu próximo jogo começa aqui.',
-    description: 'Ofertas de PC e consoles, reunidas em um só lugar.',
-    icon: Icons.explore_outlined,
-    metrics: [
-      MetricPill(
-        icon: Icons.local_offer_outlined,
-        label: '$offerCount ofertas',
+            ),
+          ),
+        ],
       ),
-      MetricPill(icon: Icons.storefront_outlined, label: '$storeCount lojas'),
-    ],
-    actions: actions,
-  );
+    );
+  }
 }

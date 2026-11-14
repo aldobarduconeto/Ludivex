@@ -188,7 +188,6 @@ class _WishlistScreenState extends State<WishlistScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       PageIntro(
-                        eyebrow: 'NO SEU RADAR',
                         title: 'Sua lista. Seu próximo jogo.',
                         description: 'Acompanhe seus favoritos e receba avisos quando o preço chegar à sua meta.',
                         icon: Icons.favorite_outline_rounded,

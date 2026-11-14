@@ -1,9 +1,12 @@
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import '../models/library_game.dart';
 import 'local_game_launcher.dart';
+import 'desktop_store.dart';
 import 'mobile_game_launcher.dart';
 import 'preferences_store.dart';
 
@@ -69,13 +72,34 @@ class LibraryService extends ChangeNotifier {
   static int _compare(LibraryGame a, LibraryGame b) =>
       a.title.toLowerCase().compareTo(b.title.toLowerCase());
 
-  Future<void> save(LibraryGame game) {
+  Future<void> save(LibraryGame game, {bool preserveActivity = false}) {
     LibraryGame.fromJson(game.toJson());
-    return _mutate(() => [..._items.where((g) => g.id != game.id), game]);
+    return _mutate(() {
+      var updated = game;
+      if (preserveActivity) {
+        for (final item in _items.where((item) => item.id == game.id)) {
+          updated = game.withLauncherActivity(
+            favorite: item.favorite,
+            lastLaunchedAt: item.lastLaunchedAt,
+          );
+        }
+      }
+      return [..._items.where((g) => g.id != game.id), updated];
+    });
   }
 
   Future<void> remove(String id) =>
       _mutate(() => _items.where((g) => g.id != id).toList());
+
+  Future<void> setFavorite(String id, bool favorite) => _mutate(
+    () => [
+      for (final game in _items)
+        if (game.id == id)
+          game.withLauncherActivity(favorite: favorite)
+        else
+          game,
+    ],
+  );
 
   Future<void> importGames(Iterable<LibraryGame> games) {
     final incoming = games.toList();
@@ -97,14 +121,26 @@ class LibraryService extends ChangeNotifier {
     });
   }
 
-  Future<void> launch(LibraryGame game) async {
+  Future<bool> launch(LibraryGame game) async {
     if (LibraryGame.validateTarget(game.target, local: game.local) != null) {
       throw const FormatException('Destino inválido.');
     }
-    if (LibraryGame.androidPackage(game.target) != null) {
+    final storeTarget = LibraryGame.storeTarget(game.target);
+    if (storeTarget != null) {
+      final store = StoreProvider.values.firstWhere(
+        (provider) => provider.key == storeTarget.store,
+      );
+      await store.open(await LauncherSettings.load()).launch(storeTarget.id);
+    } else if (LibraryGame.androidPackage(game.target) != null) {
       await MobileGameLauncher.launch(game.target);
     } else if (game.local) {
-      await launchLocalGame(game.target);
+      final handled =
+          supportsCompatibility &&
+          game.target.toLowerCase().endsWith('.exe') &&
+          await (await LauncherSettings.load()).launchWindowsExecutable(
+            game.target,
+          );
+      if (!handled) await launchLocalGame(game.target);
     } else if (LibraryGame.isWindowsAppTarget(game.target)) {
       await launchWindowsApp(game.target);
     } else if (!await launchUrl(
@@ -112,6 +148,21 @@ class LibraryService extends ChangeNotifier {
       mode: LaunchMode.externalApplication,
     )) {
       throw StateError('Launcher indisponível.');
+    }
+    final launchedAt = DateTime.now();
+    try {
+      await _mutate(
+        () => [
+          for (final item in _items)
+            if (item.id == game.id)
+              item.withLauncherActivity(lastLaunchedAt: launchedAt)
+            else
+              item,
+        ],
+      );
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 }

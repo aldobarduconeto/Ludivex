@@ -41,93 +41,87 @@ class CollectionSearchField extends StatelessWidget {
 class PageIntro extends StatelessWidget {
   const PageIntro({
     super.key,
-    required this.eyebrow,
     required this.title,
     required this.description,
     required this.icon,
     this.actions = const [],
     this.metrics = const [],
   });
-  final String eyebrow, title, description;
+  final String title, description;
   final IconData icon;
   final List<Widget> actions, metrics;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context), c = theme.colorScheme;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final compact = constraints.maxWidth < 600;
-        return Padding(
-          padding: EdgeInsets.symmetric(vertical: compact ? 8 : 16),
+    final heading = Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: c.primaryContainer,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Icon(icon, size: 22, color: c.onPrimaryContainer),
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          eyebrow,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: c.onSurfaceVariant,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: .8,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          title,
-                          style:
-                              (compact
-                                      ? theme.textTheme.headlineSmall
-                                      : theme.textTheme.headlineMedium)
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: -.7,
-                                  ),
-                        ),
-                        const SizedBox(height: 10),
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 650),
-                          child: Text(
-                            description,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: c.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+              Text(title, style: theme.textTheme.headlineMedium),
+              if (description.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: c.onSurfaceVariant,
                   ),
-                  if (!compact) ...[
-                    const SizedBox(width: 24),
-                    Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: c.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Icon(icon, color: c.onSurfaceVariant, size: 28),
-                    ),
-                  ],
-                ],
-              ),
-              if (metrics.isNotEmpty) ...[
-                const SizedBox(height: 20),
-                Wrap(spacing: 10, runSpacing: 10, children: metrics),
-              ],
-              if (actions.isNotEmpty) ...[
-                const SizedBox(height: 22),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: actions,
                 ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+    final controls = Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: actions,
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final inlineActions =
+            actions.isNotEmpty &&
+            constraints.maxWidth >= 840 &&
+            MediaQuery.textScalerOf(context).scale(16) <= 20;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (inlineActions)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 3, child: heading),
+                    const SizedBox(width: 16),
+                    Flexible(flex: 2, child: controls),
+                  ],
+                )
+              else
+                heading,
+              if (metrics.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Wrap(spacing: 8, runSpacing: 8, children: metrics),
+              ],
+              if (!inlineActions && actions.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                controls,
               ],
             ],
           ),

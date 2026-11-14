@@ -503,7 +503,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               children: [
                 PageIntro(
-                  eyebrow: 'PREFERÊNCIAS E SISTEMA',
                   title: 'Configurações',
                   description:
                       'Gerencie tema (claro, escuro ou OLED preto puro), lojas ativas, notificações, dispositivos e armazenamento. Tudo sob seu controle, sem envio de dados a terceiros.',

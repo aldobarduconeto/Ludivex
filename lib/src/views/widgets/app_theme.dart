@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 abstract final class LudivexTheme {
-  static const accent = Color(0xFF82E2A5);
+  static const accent = Color(0xFFBCACFF);
 
   static ThemeData buildLight() => build(Brightness.light);
   static ThemeData buildDark() => build(Brightness.dark, oled: false);
@@ -11,28 +11,28 @@ abstract final class LudivexTheme {
     final dark = brightness == Brightness.dark;
     final isOled = dark && oled;
     final colors = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF20B969),
+      seedColor: const Color(0xFF7957DC),
       brightness: brightness,
-      primary: dark ? accent : const Color(0xFF176B43),
-      secondary: dark ? const Color(0xFF8ABAF5) : const Color(0xFF285D9B),
+      primary: dark ? accent : const Color(0xFF5733AD),
+      secondary: dark ? const Color(0xFF9FD4F6) : const Color(0xFF245876),
       onSecondary: dark ? const Color(0xFF041626) : Colors.white,
-      onPrimary: dark ? const Color(0xFF18220D) : Colors.white,
+      onPrimary: dark ? const Color(0xFF211743) : Colors.white,
       surface: isOled
           ? const Color(0xFF000000)
-          : (dark ? const Color(0xFF15191F) : Colors.white),
-      onSurface: dark ? const Color(0xFFF0F2F5) : const Color(0xFF1C2634),
+          : (dark ? const Color(0xFF191822) : Colors.white),
+      onSurface: dark ? const Color(0xFFF0F2F5) : const Color(0xFF242135),
       onSurfaceVariant: dark
-          ? const Color(0xFF9AA6B6)
+          ? const Color(0xFFB0AABF)
           : const Color(0xFF647083),
       outlineVariant: isOled
           ? const Color(0xFF22262E)
-          : (dark ? const Color(0xFF2A3039) : const Color(0xFFE5E8ED)),
+          : (dark ? const Color(0xFF383344) : const Color(0xFFDCD6E7)),
       primaryContainer: dark
-          ? (isOled ? const Color(0xFF0F2618) : const Color(0xFF173824))
-          : const Color(0xFFD6F5DC),
+          ? (isOled ? const Color(0xFF251B3A) : const Color(0xFF30264E))
+          : const Color(0xFFEDE4FF),
       onPrimaryContainer: dark
-          ? const Color(0xFFC4FFD0)
-          : const Color(0xFF12351C),
+          ? const Color(0xFFE9DEFF)
+          : const Color(0xFF301F59),
       secondaryContainer: dark
           ? (isOled ? const Color(0xFF0D1E2A) : const Color(0xFF163044))
           : const Color(0xFFDCEFFF),
@@ -41,10 +41,16 @@ abstract final class LudivexTheme {
           : const Color(0xFF10334C),
       surfaceContainerHighest: isOled
           ? const Color(0xFF111418)
-          : (dark ? const Color(0xFF22272F) : const Color(0xFFEDF0F4)),
+          : (dark ? const Color(0xFF2B2736) : const Color(0xFFEFEBF5)),
       surfaceContainerLow: isOled
           ? const Color(0xFF08090C)
-          : (dark ? const Color(0xFF191E25) : const Color(0xFFF8FAFB)),
+          : (dark ? const Color(0xFF1D1B28) : const Color(0xFFF3EFF8)),
+      surfaceContainer: isOled
+          ? const Color(0xFF0C0B10)
+          : (dark ? const Color(0xFF211E2C) : const Color(0xFFF0ECF7)),
+      surfaceContainerHigh: isOled
+          ? const Color(0xFF100F15)
+          : (dark ? const Color(0xFF262332) : const Color(0xFFEBE6F3)),
     );
     final base = ThemeData(
       useMaterial3: true,
@@ -56,14 +62,14 @@ abstract final class LudivexTheme {
       hoverColor: colors.primary.withValues(alpha: .06),
       scaffoldBackgroundColor: isOled
           ? const Color(0xFF000000)
-          : (dark ? const Color(0xFF0E1116) : const Color(0xFFF7F8FA)),
+          : (dark ? const Color(0xFF111019) : const Color(0xFFF7F5FB)),
       textTheme: base.textTheme
           .apply(bodyColor: colors.onSurface, displayColor: colors.onSurface)
           .copyWith(
             headlineLarge: TextStyle(
               fontFamily: 'Roboto',
               fontSize: 36,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w900,
               letterSpacing: -1,
               color: colors.onSurface,
             ),
@@ -130,7 +136,9 @@ abstract final class LudivexTheme {
         helperMaxLines: 3,
         errorMaxLines: 3,
         filled: true,
-        fillColor: isOled ? const Color(0xFF07090C) : colors.surfaceContainerLow,
+        fillColor: isOled
+            ? const Color(0xFF07090C)
+            : colors.surfaceContainerLow,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 16,
