@@ -124,17 +124,20 @@ class EpicStore implements DesktopStore {
 
   final LauncherSettings settings;
 
-  Future<Uri> loginUrl() async => Uri.parse('https://legendary.gl/epiclogin');
+  Future<Uri> loginUrl() async => Uri.https('www.epicgames.com', '/id/login', {
+    'redirectUrl': Uri.https('www.epicgames.com', '/id/api/redirect', {
+      'clientId': '34a02cf8f4414e29b15921876da36f9a',
+      'responseType': 'code',
+    }).toString(),
+  });
 
   Future<String> _run(
     List<String> args, {
-    String? input,
     void Function(String)? onProgress,
     bool saveOutput = false,
   }) => _runStore(
     settings.legendary,
     ['-y', ...args],
-    input: input,
     onProgress: onProgress,
     saveOutput: saveOutput,
   );
@@ -142,7 +145,7 @@ class EpicStore implements DesktopStore {
     if (!RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(code)) {
       throw const FormatException('Código de autorização inválido.');
     }
-    await _run(['auth', '--disable-webview'], input: code);
+    await _run(['auth', '--code', code]);
   }
 
   Future<void> signOut() async => _run(['auth', '--delete']);
@@ -216,7 +219,6 @@ class EpicStore implements DesktopStore {
 Future<String> _runStore(
   String executable,
   List<String> args, {
-  String? input,
   void Function(String)? onProgress,
   bool saveOutput = false,
   Map<String, String>? environment,
@@ -239,7 +241,6 @@ Future<String> _runStore(
         final progress = RegExp(r'\b\d+(?:\.\d+)?%').firstMatch(line);
         if (progress != null) onProgress?.call(progress[0]!);
       });
-  if (input != null) process.stdin.writeln(input);
   await Future.wait([stdout, stderr, process.stdin.close()]);
   if (await process.exitCode != 0) {
     throw StateError('O backend da loja não concluiu a operação.');

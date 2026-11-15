@@ -455,7 +455,7 @@ class _LibraryScreenState extends State<LibraryScreen>
               source: entry.value.store.label,
               target: entry.key,
             ),
-      ]..sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+      ];
       final mobileGames = _mobileScan == null
           ? const <LibraryGame>[]
           : _newGames(_mobileScan!);
@@ -527,15 +527,12 @@ class _LibraryScreenState extends State<LibraryScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Biblioteca de jogos',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
+                  PageIntro(
+                    title: 'Biblioteca de jogos',
+                    description:
+                        '${all.length} jogos · ${sources.length} plataformas',
+                    icon: Icons.sports_esports_outlined,
+                    actions: [
                       if (supportsStoreAccounts)
                         OutlinedButton.icon(
                           onPressed: _accounts.loading

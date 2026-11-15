@@ -43,13 +43,13 @@ No desktop, confirme a busca e, se necessário, informe uma pasta adicional da S
 
 Abra **Biblioteca → Lojas e compatibilidade** e selecione uma loja. Instale o executável correspondente e coloque-o no PATH ou informe seu caminho na tela.
 
-| Loja | Backend | Como concluir o login |
-| --- | --- | --- |
-| Epic Games | [Legendary](https://github.com/legendary-gl/legendary) | Abra o login no navegador e cole o valor de `authorizationCode`. |
-| GOG | [gogdl](https://github.com/Heroic-Games-Launcher/heroic-gogdl) | Abra o login e cole a URL de retorno. |
-| Amazon Games | [Nile](https://github.com/imLinguin/nile) | Abra o login pelo Ludivex e cole a URL de retorno na mesma tela. |
+| Loja | Backend |
+| --- | --- |
+| Epic Games | [Legendary](https://github.com/legendary-gl/legendary) |
+| GOG | [gogdl](https://github.com/Heroic-Games-Launcher/heroic-gogdl) |
+| Amazon Games | [Nile](https://github.com/imLinguin/nile) |
 
-1. Selecione **Conectar** ou use **Carregar jogos** para uma sessão existente.
+1. Escolha **Entrar** e autentique-se na página da loja dentro do Ludivex. Ao concluir, o app fecha a página e sincroniza os jogos da conta automaticamente. Use **Carregar jogos** para reaproveitar uma sessão existente.
 2. Escolha **Instalar** para baixar um jogo adquirido. O aplicativo adiciona a instalação à Biblioteca depois de confirmá-la. Use **Adicionar** quando uma instalação reconhecida já estiver disponível.
 3. Volte à **Biblioteca** para jogar. Use **Atualizar jogos das contas** para consultar novamente os catálogos das lojas.
 
@@ -78,7 +78,7 @@ flutter devices
 flutter run -d windows
 ```
 
-Troque `windows` por `linux`, `macos` ou pelo identificador listado em `flutter devices`. Builds desktop usam a toolchain do sistema correspondente. No Windows, o Flutter precisa de suporte a links simbólicos para configurar plugins. No Linux, o CI usa Clang, CMake, Ninja, pkg-config e GTK 3.
+Troque `windows` por `linux`, `macos` ou pelo identificador listado em `flutter devices`. Builds desktop usam a toolchain do sistema correspondente. No Windows, o Flutter precisa de suporte a links simbólicos para configurar plugins. No Linux, o CI usa Clang, CMake, Ninja, pkg-config, GTK 3 e WebKitGTK 4.1. O login integrado usa WebView2 no Windows, WKWebView no macOS e WebKitGTK 4.1 no Linux.
 
 ```sh
 flutter analyze

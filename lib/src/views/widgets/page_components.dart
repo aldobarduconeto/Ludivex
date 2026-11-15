@@ -99,8 +99,14 @@ class PageIntro extends StatelessWidget {
             actions.isNotEmpty &&
             constraints.maxWidth >= 840 &&
             MediaQuery.textScalerOf(context).scale(16) <= 20;
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: EdgeInsets.all(constraints.maxWidth < 480 ? 14 : 20),
+          decoration: BoxDecoration(
+            color: c.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: c.outlineVariant.withValues(alpha: .65)),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

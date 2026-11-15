@@ -497,7 +497,8 @@ class _AppState extends State<App> with WidgetsBindingObserver {
       AnimatedBuilder(
         animation: Listenable.merge([_prefs, _wishlist]),
         builder: (context, _) => LayoutBuilder(
-          builder: (context, constraints) => constraints.maxWidth < 1100
+          builder: (context, constraints) =>
+              constraints.maxWidth < appSidebarBreakpoint
               ? child
               : Scaffold(
                   body: Row(
@@ -509,47 +510,52 @@ class _AppState extends State<App> with WidgetsBindingObserver {
                 ),
         ),
       );
-  Widget _desktopHeader(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
-    child: Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                _tab == 0
-                    ? 'Descobrir'
-                    : _tab == 1
-                    ? 'Lista de desejos'
-                    : _tab == devicesTabIndex
-                    ? 'Dispositivos'
-                    : _tab == 3
-                    ? 'Biblioteca'
-                    : _tab == newsTabIndex
-                    ? 'Notícias'
-                    : 'Configurações',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-            ],
+  String get _sectionTitle => switch (_tab) {
+    0 => 'Descobrir',
+    1 => 'Lista de desejos',
+    3 => 'Biblioteca',
+    devicesTabIndex => 'Dispositivos',
+    newsTabIndex => 'Notícias',
+    _ => 'Configurações',
+  };
+
+  Widget _desktopHeader(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.surfaceContainerLow,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _sectionTitle,
+                    style: theme.textTheme.titleMedium,
+                  ),
+                ),
+                if (_tab == 0) ...[
+                  IconButton(
+                    tooltip: 'Atualizar ofertas',
+                    onPressed: _loading ? null : () => _refresh(force: true),
+                    icon: const Icon(Icons.sync_rounded),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.tonalIcon(
+                    onPressed: () => _add(context),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Adicionar à lista'),
+                  ),
+                ],
+              ],
+            ),
           ),
-        ),
-        if (_tab == 0)
-          IconButton(
-            tooltip: 'Atualizar ofertas',
-            onPressed: _loading ? null : () => _refresh(force: true),
-            icon: const Icon(Icons.sync_rounded, size: 21),
-          ),
-        const SizedBox(width: 12),
-        if (_tab == 0)
-          FilledButton.icon(
-            onPressed: () => _add(context),
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text('Adicionar à lista'),
-          ),
-      ],
-    ),
-  );
+          const Divider(height: 1),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -605,7 +611,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
     home: Builder(
       builder: (context) => LayoutBuilder(
         builder: (context, constraints) {
-          final wide = constraints.maxWidth >= 1100;
+          final wide = constraints.maxWidth >= appSidebarBreakpoint;
           return Scaffold(
             key: _shellKey,
             drawer: wide ? null : Drawer(width: 280, child: _sidebar(context)),
@@ -617,33 +623,8 @@ class _AppState extends State<App> with WidgetsBindingObserver {
                       icon: const Icon(Icons.menu_rounded),
                       onPressed: () => _shellKey.currentState?.openDrawer(),
                     ),
-                    titleSpacing: 0,
-                    title: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.asset(
-                            'assets/branding/app_icon.png',
-                            width: 29,
-                            height: 29,
-                            cacheWidth: 87,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Flexible(
-                          child: Text(
-                            'ludivex',
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 19,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -.6,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                    centerTitle: true,
+                    title: Text(_sectionTitle, overflow: TextOverflow.ellipsis),
                     actions: [
                       if (_tab == 0)
                         IconButton(
@@ -678,17 +659,17 @@ class _AppState extends State<App> with WidgetsBindingObserver {
                           child: Center(
                             child: ConstrainedBox(
                               constraints: const BoxConstraints(maxWidth: 1600),
-                              child: IndexedStack(
+                              child: _LazySections(
                                 index: _tab,
-                                children: [
-                                  _catalog(context),
-                                  WishlistScreen(
+                                pages: [
+                                  () => _catalog(context),
+                                  () => WishlistScreen(
                                     service: _wishlist,
                                     onAdd: () => _add(context),
                                     onEdit: (item) => _add(context, item: item),
                                     onRefresh: () => _refresh(force: true),
                                   ),
-                                  SettingsScreen(
+                                  () => SettingsScreen(
                                     api: _api,
                                     wishlist: _wishlist,
                                     embedded: true,
@@ -697,15 +678,15 @@ class _AppState extends State<App> with WidgetsBindingObserver {
                                       unawaited(_refresh());
                                     },
                                   ),
-                                  LibraryScreen(
+                                  () => LibraryScreen(
                                     service: LibraryService.instance,
                                     active: _tab == 3,
                                   ),
-                                  DevicesScreen(
+                                  () => DevicesScreen(
                                     service: DeviceService.instance,
                                     active: _tab == devicesTabIndex,
                                   ),
-                                  NewsScreen(
+                                  () => NewsScreen(
                                     library: LibraryService.instance,
                                     transport: _api.transport,
                                     active: _tab == newsTabIndex,
@@ -1408,4 +1389,34 @@ class _AppState extends State<App> with WidgetsBindingObserver {
       ],
     ),
   );
+}
+
+/// Mount each section at first use and keep its scroll and form state afterward.
+class _LazySections extends StatefulWidget {
+  const _LazySections({required this.index, required this.pages});
+
+  final int index;
+  final List<Widget Function()> pages;
+
+  @override
+  State<_LazySections> createState() => _LazySectionsState();
+}
+
+class _LazySectionsState extends State<_LazySections> {
+  final _visited = <int>{};
+
+  @override
+  Widget build(BuildContext context) {
+    _visited.add(widget.index);
+    return IndexedStack(
+      index: widget.index,
+      children: [
+        for (var i = 0; i < widget.pages.length; i++)
+          if (_visited.contains(i))
+            TickerMode(enabled: i == widget.index, child: widget.pages[i]())
+          else
+            const SizedBox.shrink(),
+      ],
+    );
+  }
 }

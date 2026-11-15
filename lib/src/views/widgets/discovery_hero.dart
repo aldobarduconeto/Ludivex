@@ -20,7 +20,7 @@ class DiscoveryHero extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final image = featured?.imageUrl;
-    const backdrop = Color(0xFF151421);
+    const backdrop = Color(0xFF171421);
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
       child: Stack(
@@ -31,7 +31,7 @@ class DiscoveryHero extends StatelessWidget {
               child: Image.network(
                 image,
                 fit: BoxFit.cover,
-                alignment: Alignment.centerRight,
+                alignment: Alignment.topCenter,
                 cacheWidth: 1280,
                 excludeFromSemantics: true,
                 errorBuilder: (_, _, _) => const SizedBox.shrink(),
@@ -46,13 +46,13 @@ class DiscoveryHero extends StatelessWidget {
                     backdrop.withValues(alpha: image == null ? .92 : .84),
                     const Color(0x80302A55),
                   ],
-                  stops: const [0, .48, 1],
+                  stops: const [0, .38, 1],
                 ),
               ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 30),
+            padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 450),
               child: Column(

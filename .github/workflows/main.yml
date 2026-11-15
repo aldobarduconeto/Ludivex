@@ -167,7 +167,7 @@ jobs:
       - name: Instalar dependências do Linux
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-12-dev
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-12-dev libwebkit2gtk-4.1-dev
           flutter pub get
 
       - name: Build para Linux
@@ -190,7 +190,7 @@ jobs:
           Version: $version
           Architecture: $arch
           Maintainer: Ludivex <aldobarduconeto@users.noreply.github.com>
-          Depends: libgtk-3-0, libstdc++6
+          Depends: libgtk-3-0, libstdc++6, libwebkit2gtk-4.1-0
           Section: games
           Priority: optional
           Description: Ludivex game library and deals
