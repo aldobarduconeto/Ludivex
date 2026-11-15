@@ -653,7 +653,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                             spacing: 8,
                             runSpacing: 8,
                             children: [
-                              for (final (filter, label) in const [
+                              for (final (filter, label) in [
                                 (_LibraryFilter.all, 'Todos os jogos'),
                                 (_LibraryFilter.favorites, 'Favoritos'),
                                 (_LibraryFilter.recent, 'Recentes'),
