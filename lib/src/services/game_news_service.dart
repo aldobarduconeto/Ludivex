@@ -6,6 +6,7 @@ class GameNewsService {
   const GameNewsService(this.transport);
 
   final ApiTransport transport;
+  static final _appIdCache = <String, String?>{};
 
   Future<List<GameNews>?> load(String title, {String? target}) async {
     final appId =
@@ -76,6 +77,8 @@ class GameNewsService {
   }
 
   Future<String?> _findAppId(String title) async {
+    final normalized = title.trim().toLowerCase();
+    if (_appIdCache.containsKey(normalized)) return _appIdCache[normalized];
     final data = await transport.getJson(
       Uri.https('store.steampowered.com', '/api/storesearch/', {
         'term': title,
@@ -87,14 +90,15 @@ class GameNewsService {
     if (items is! List) {
       throw const FormatException('Resposta da busca Steam inválida');
     }
-    final normalized = title.trim().toLowerCase();
     final ids = {
       for (final item in items.whereType<Map>())
         if (item['name'] is String &&
             (item['name'] as String).trim().toLowerCase() == normalized)
           _validId('${item['id']}'),
     }.whereType<String>().toSet();
-    return ids.length == 1 ? ids.single : null;
+    final resolved = ids.length == 1 ? ids.single : null;
+    _appIdCache[normalized] = resolved;
+    return resolved;
   }
 
   static String? _validId(String value) {

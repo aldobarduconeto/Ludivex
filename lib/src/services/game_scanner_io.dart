@@ -10,6 +10,11 @@ bool get supportsGameScan =>
 String _join(String parent, String child) =>
     '$parent${Platform.pathSeparator}$child';
 
+final _pathRegex = RegExp(r'"path"\s+"((?:\\.|[^"\\])*)"');
+final _manifestRegex = RegExp(r'appmanifest_\d+\.acf$');
+final _acfFieldRegex = RegExp(r'"([^"\r\n]+)"\s+"([^"\r\n]*)"');
+final _numericIdRegex = RegExp(r'^\d+$');
+
 // These readers also accept explicit folders so tests never inspect real libraries.
 Future<GameScanResult> scanGameFolders({
   required Iterable<String> steamRoots,
@@ -30,21 +35,16 @@ Future<GameScanResult> scanGameFolders({
       final folders = File(_join(apps.path, 'libraryfolders.vdf'));
       if (await folders.exists()) {
         final text = await folders.readAsString();
-        for (final match in RegExp(
-          r'"path"\s+"((?:\\.|[^"\\])*)"',
-        ).allMatches(text)) {
+        for (final match in _pathRegex.allMatches(text)) {
           roots.add(Directory(match[1]!.replaceAll(r'\\', r'\')).absolute.path);
         }
       }
       await for (final entity in apps.list(followLinks: false)) {
-        if (entity is! File ||
-            !RegExp(r'appmanifest_\d+\.acf$').hasMatch(entity.path))
+        if (entity is! File || !_manifestRegex.hasMatch(entity.path))
           continue;
         try {
           final fields = <String, String>{
-            for (final match in RegExp(
-              r'"([^"\r\n]+)"\s+"([^"\r\n]*)"',
-            ).allMatches(await entity.readAsString()))
+            for (final match in _acfFieldRegex.allMatches(await entity.readAsString()))
               match[1]!: match[2]!,
           };
           final id = fields['appid'];
@@ -52,7 +52,7 @@ Future<GameScanResult> scanGameFolders({
           final folder = fields['installdir'];
           final flags = int.tryParse(fields['StateFlags'] ?? '') ?? 0;
           if (id == null ||
-              !RegExp(r'^\d+$').hasMatch(id) ||
+              !_numericIdRegex.hasMatch(id) ||
               title == null ||
               title.trim().isEmpty ||
               folder == null ||

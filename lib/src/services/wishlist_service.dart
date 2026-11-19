@@ -22,10 +22,19 @@ class WishlistService extends ChangeNotifier {
   List<WishlistItem>? _cachedItems;
   List<String>? _cachedXboxIds;
   List<Map<String, dynamic>> _cachedAlerts = const [];
+  bool _alertsDirty = true;
 
   List<WishlistItem> get items =>
       _cachedItems ??= List.unmodifiable(_items.values);
-  List<Map<String, dynamic>> get alerts => _cachedAlerts;
+  List<Map<String, dynamic>> get alerts {
+    if (_alertsDirty) {
+      _cachedAlerts = List.unmodifiable(
+        _alerts.map((e) => Map<String, dynamic>.unmodifiable(e)),
+      );
+      _alertsDirty = false;
+    }
+    return _cachedAlerts;
+  }
   List<String> get xboxIds => _cachedXboxIds ??= items
       .where((i) => i.platform == GamePlatform.xbox && i.productId != null)
       .map((i) => i.productId!)
@@ -41,9 +50,6 @@ class WishlistService extends ChangeNotifier {
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     _cachedItems = List.unmodifiable(sorted);
     _cachedXboxIds = null;
-    _cachedAlerts = List.unmodifiable(
-      _alerts.map((e) => Map<String, dynamic>.unmodifiable(e)),
-    );
   }
 
   Future<void> load({SharedPreferencesAsync? storage}) async {
@@ -125,6 +131,7 @@ class WishlistService extends ChangeNotifier {
         await _storage.remove('wishlist');
       });
     }
+    _alertsDirty = true;
     _rebuildIndex();
   }
 
@@ -279,10 +286,12 @@ class WishlistService extends ChangeNotifier {
   });
   Future<void> clearAlerts() => _mutate(() {
     _alerts.clear();
+    _alertsDirty = true;
   });
   Future<void> clear() => _mutate(() {
     _items.clear();
     _alerts.clear();
+    _alertsDirty = true;
   });
 
   String exportJson() =>
@@ -338,17 +347,20 @@ class WishlistService extends ChangeNotifier {
     Future<void> Function(GameDeal)? onAlert,
   ) async {
     final quotes = {for (final quote in known) quote.id: quote};
-    final knownUrls = known
-        .map((q) => canonicalStoreUrl(q.storeUrl))
-        .where((u) => u.isNotEmpty)
-        .toSet();
-    final pending = items
-        .where(
-          (i) =>
-              !quotes.containsKey(i.id) &&
-              !knownUrls.contains(canonicalStoreUrl(i.storeUrl)),
-        )
-        .toList();
+    final knownUrls = <String>{};
+    for (final q in known) {
+      if (q.storeUrl != null) {
+        final canon = canonicalStoreUrl(q.storeUrl);
+        if (canon.isNotEmpty) knownUrls.add(canon);
+      }
+    }
+    final pending = <WishlistItem>[];
+    for (final i in items) {
+      if (quotes.containsKey(i.id)) continue;
+      final canon = i.storeUrl == null ? '' : canonicalStoreUrl(i.storeUrl);
+      if (canon.isNotEmpty && knownUrls.contains(canon)) continue;
+      pending.add(i);
+    }
     // Full-price Xbox quotes are obtained in a batch, including followed games
     // outside the first 100 catalog IDs. Rotate large wishlists across cycles.
     final xbox = pending
@@ -392,21 +404,26 @@ class WishlistService extends ChangeNotifier {
       _quoteCursor =
           (offset + min(8, individual.length).toInt()) % individual.length;
     }
-    var index = 0;
-    await Future.wait(
-      List.generate(min(2, scheduled.length), (_) async {
-        while (index < scheduled.length) {
-          final item = scheduled[index++];
-          if (item.productId == null) continue;
-          try {
-            final quote = await api.lookup(item.platform, item.productId!);
-            if (quote != null && !quote.isExpired) quotes[quote.id] = quote;
-          } catch (_) {
-            /* An unavailable quote never clears the saved game. */
+    final concurrency = min(4, scheduled.length);
+    if (concurrency > 0) {
+      final chunks = List.generate(concurrency, (_) => <WishlistItem>[]);
+      for (var i = 0; i < scheduled.length; i++) {
+        chunks[i % concurrency].add(scheduled[i]);
+      }
+      await Future.wait(
+        chunks.map((chunk) async {
+          for (final item in chunk) {
+            if (item.productId == null) continue;
+            try {
+              final quote = await api.lookup(item.platform, item.productId!);
+              if (quote != null && !quote.isExpired) quotes[quote.id] = quote;
+            } catch (_) {
+              /* An unavailable quote never clears the saved game. */
+            }
           }
-        }
-      }),
-    );
+        }),
+      );
+    }
     if (quotes.isEmpty) return;
     final notify = <GameDeal>[];
     await _mutate(() {
@@ -451,6 +468,7 @@ class WishlistService extends ChangeNotifier {
               : item.lastNotifiedPrice,
         );
         if (alert) {
+          _alertsDirty = true;
           _alerts.insert(0, {
             'id': '${DateTime.now().microsecondsSinceEpoch}:${item.id}',
             'deal': quote.toJson(),

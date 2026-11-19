@@ -109,8 +109,12 @@ class DealsApi {
           final deals = (raw['deals'] as List)
               .map((d) => GameDeal.fromJson(d as Map<String, dynamic>))
               .toList();
+          final keyStr = raw['key'] as String;
+          final keyPlatform = GamePlatform.parse(
+            (jsonDecode(keyStr) as List).first as String,
+          );
           _cache.putIfAbsent(
-            raw['key'] as String,
+            keyStr,
             () => _CachedDeals(
               deals,
               at,
@@ -120,10 +124,7 @@ class DealsApi {
                 for (final c in raw['campaigns'] as List? ?? [])
                   SaleCampaign.fromJson(
                     c as Map<String, dynamic>,
-                    GamePlatform.parse(
-                      (jsonDecode(raw['key'] as String) as List).first
-                          as String,
-                    ),
+                    keyPlatform,
                   ),
               ],
             ),
@@ -153,7 +154,7 @@ class DealsApi {
         'campaigns': entry.value.campaigns.map((c) => c.toJson()).toList(),
         'deals': entry.value.deals.take(500).map((d) => d.toJson()).toList(),
       });
-      final size = utf8.encode(chunk).length + (chunks.isEmpty ? 0 : 1);
+      final size = chunk.length + (chunks.isEmpty ? 0 : 1);
       if (bytes + size > 512 * 1024) continue;
       chunks.add(chunk);
       bytes += size;

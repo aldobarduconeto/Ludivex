@@ -92,7 +92,6 @@ class _AppState extends State<App> with WidgetsBindingObserver {
     (id: 'consoles', label: '🎯 Consoles', hint: 'PlayStation e Xbox'),
   ];
   Timer? _debounce, _timer;
-  Timer? _collectionTimer;
   String? _catalogSignature;
   int? _minutes;
   final _shellKey = GlobalKey<ScaffoldState>();
@@ -157,7 +156,6 @@ class _AppState extends State<App> with WidgetsBindingObserver {
   }
 
   void _schedule() {
-    _scheduleCollection();
     if (_timer?.isActive == true &&
         _foreground &&
         _prefs.autoRefresh &&
@@ -176,47 +174,6 @@ class _AppState extends State<App> with WidgetsBindingObserver {
     );
   }
 
-  void _scheduleCollection() {
-    _collectionTimer?.cancel();
-    if (!mounted ||
-        !widget.backgroundSync ||
-        !_foreground ||
-        _overlayOpen ||
-        _loading ||
-        _loadingMore ||
-        _catalogSignature != _prefs.sourceSignature ||
-        !_api.hasMore)
-      return;
-    _collectionTimer = Timer(
-      _api.collectionDelay,
-      () => unawaited(_collectCatalog()),
-    );
-  }
-
-  Future<void> _collectCatalog() async {
-    if (!mounted || _loading || _loadingMore || !_foreground || _overlayOpen)
-      return;
-    final signature = _prefs.sourceSignature;
-    setState(() => _loadingMore = true);
-    try {
-      final deals = await _api.loadMore();
-      if (mounted && signature == _prefs.sourceSignature) {
-        setState(() => _deals = deals);
-        await _checkNewPromotions(deals);
-      }
-    } catch (_) {
-      if (mounted)
-        setState(
-          () => _error = 'A coleta foi pausada e será tentada novamente. As ofertas carregadas foram mantidas.',
-        );
-    } finally {
-      if (mounted) {
-        setState(() => _loadingMore = false);
-        _scheduleCollection();
-      }
-    }
-  }
-
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _foreground = state == AppLifecycleState.resumed;
@@ -225,7 +182,6 @@ class _AppState extends State<App> with WidgetsBindingObserver {
       if (!_overlayOpen) unawaited(_refresh());
     } else {
       _timer?.cancel();
-      _collectionTimer?.cancel();
     }
   }
 
@@ -235,7 +191,6 @@ class _AppState extends State<App> with WidgetsBindingObserver {
     _wishlist.removeListener(_changed);
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
-    _collectionTimer?.cancel();
     _debounce?.cancel();
     _search.dispose();
     _campaignPager.dispose();
@@ -292,13 +247,15 @@ class _AppState extends State<App> with WidgetsBindingObserver {
 
   Future<void> _refresh({bool force = false}) async {
     if (_loading && !force) return;
-    if (!force && _catalogSignature == _prefs.sourceSignature && _api.hasMore) {
-      _scheduleCollection();
+    if (!force && _catalogSignature == _prefs.sourceSignature && _deals.isNotEmpty) {
       return;
     }
-    _collectionTimer?.cancel();
     final generation = ++_requestId;
     final signature = _prefs.sourceSignature;
+    if (force) {
+      _filteredKey = null;
+      _filteredInput = null;
+    }
     if (mounted)
       setState(() {
         _loading = true;
@@ -337,7 +294,6 @@ class _AppState extends State<App> with WidgetsBindingObserver {
     } finally {
       if (mounted && generation == _requestId) {
         setState(() => _loading = false);
-        _scheduleCollection();
       }
     }
   }
@@ -442,7 +398,6 @@ class _AppState extends State<App> with WidgetsBindingObserver {
     } finally {
       if (mounted) {
         setState(() => _loadingMore = false);
-        _scheduleCollection();
       }
     }
   }
@@ -834,11 +789,33 @@ class _AppState extends State<App> with WidgetsBindingObserver {
         b.title.toLowerCase(),
       ),
     };
-    deals.sort((a, b) {
-      final first = a.platform == _prefs.preferredPlatform ? 0 : 1;
-      final second = b.platform == _prefs.preferredPlatform ? 0 : 1;
-      return first == second ? compare(a, b) : first.compareTo(second);
-    });
+    if (key == _filteredKey && _filteredDeals.isNotEmpty) {
+      final existingIds = {for (final d in _filteredDeals) d.id};
+      final dealsMap = {for (final d in deals) d.id: d};
+      final preserved = <GameDeal>[];
+      for (final d in _filteredDeals) {
+        final current = dealsMap[d.id];
+        if (current != null) {
+          preserved.add(current);
+        }
+      }
+      final fresh = deals.where((d) => !existingIds.contains(d.id)).toList();
+      fresh.sort((a, b) {
+        final first = a.platform == _prefs.preferredPlatform ? 0 : 1;
+        final second = b.platform == _prefs.preferredPlatform ? 0 : 1;
+        return first == second ? compare(a, b) : first.compareTo(second);
+      });
+      deals
+        ..clear()
+        ..addAll(preserved)
+        ..addAll(fresh);
+    } else {
+      deals.sort((a, b) {
+        final first = a.platform == _prefs.preferredPlatform ? 0 : 1;
+        final second = b.platform == _prefs.preferredPlatform ? 0 : 1;
+        return first == second ? compare(a, b) : first.compareTo(second);
+      });
+    }
     _filteredInput = _deals;
     _filteredKey = key;
     _filteredUntil = now.add(const Duration(minutes: 1));
@@ -1348,11 +1325,11 @@ class _AppState extends State<App> with WidgetsBindingObserver {
                     ),
                   const SizedBox(height: 12),
                   Text(
-                    _api.hasMore
-                        ? 'Coletando automaticamente as promoções de todas as lojas selecionadas. As ofertas aparecem conforme as páginas chegam; pausas das APIs são respeitadas.'
-                        : 'Coleta das páginas disponíveis concluída. Use Mostrar mais para revelar as ofertas já carregadas e confira os avisos de fontes indisponíveis.',
+                    deals.length < available.length || _api.hasMoreFor(_filter)
+                        ? 'Toque em "Mostrar mais promoções" para carregar mais ofertas das lojas selecionadas.'
+                        : 'Todas as ofertas disponíveis para esta seleção foram carregadas.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 11),
+                    style: const TextStyle(fontSize: 11),
                   ),
                   const SizedBox(height: 12),
                   Text(

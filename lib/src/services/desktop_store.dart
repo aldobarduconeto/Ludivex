@@ -31,6 +31,7 @@ class LauncherSettings {
   final String legendary, installFolder, wine, umu, proton, prefix;
   final GameRuntime runtime;
   static const _key = 'launcher.settings.v1';
+  static LauncherSettings? _cached;
 
   Map<String, String> get environment => {
     if (runtime != GameRuntime.system && prefix.isNotEmpty)
@@ -39,11 +40,12 @@ class LauncherSettings {
       'PROTONPATH': proton.isEmpty ? 'GE-Proton' : proton,
   };
 
-  static Future<LauncherSettings> load() async {
+  static Future<LauncherSettings> load({bool force = false}) async {
+    if (!force && _cached != null) return _cached!;
     final raw = await (await PreferencesStore.open()).getString(_key);
-    if (raw == null) return const LauncherSettings();
+    if (raw == null) return _cached = const LauncherSettings();
     final json = jsonDecode(raw) as Map<String, dynamic>;
-    return LauncherSettings(
+    return _cached = LauncherSettings(
       legendary: json['legendary'] as String,
       gogdl: json['gogdl'] as String? ?? 'gogdl',
       nile: json['nile'] as String? ?? 'nile',
@@ -57,6 +59,7 @@ class LauncherSettings {
   }
 
   Future<void> save() async {
+    _cached = this;
     final prefs = await PreferencesStore.open();
     await PreferencesStore.write(
       () => prefs.setString(

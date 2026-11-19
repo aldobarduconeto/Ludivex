@@ -43,8 +43,10 @@ extension on LauncherSettings {
         };
 }
 
-bool _validId(String id) =>
-    RegExp(r'^[A-Za-z0-9_][A-Za-z0-9_.-]*$').hasMatch(id);
+final _validIdRegex = RegExp(r'^[A-Za-z0-9_][A-Za-z0-9_.-]*$');
+final _gogNumericRegex = RegExp(r'^\d+$');
+
+bool _validId(String id) => _validIdRegex.hasMatch(id);
 
 Future<void> _launchBackend(
   String binary,
@@ -251,7 +253,7 @@ class _GogStore implements DesktopStore {
       );
       for (final item in (data['items'] as List).whereType<Map>()) {
         final id = item['external_id'].toString();
-        if (item['platform_id'] == 'gog' && RegExp(r'^\d+$').hasMatch(id)) {
+        if (item['platform_id'] == 'gog' && _gogNumericRegex.hasMatch(id)) {
           ids.add(id);
         }
       }

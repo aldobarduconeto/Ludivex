@@ -72,21 +72,20 @@ class LibraryService extends ChangeNotifier {
   static int _compare(LibraryGame a, LibraryGame b) =>
       a.title.toLowerCase().compareTo(b.title.toLowerCase());
 
-  Future<void> save(LibraryGame game, {bool preserveActivity = false}) {
-    LibraryGame.fromJson(game.toJson());
-    return _mutate(() {
-      var updated = game;
-      if (preserveActivity) {
-        for (final item in _items.where((item) => item.id == game.id)) {
-          updated = game.withLauncherActivity(
-            favorite: item.favorite,
-            lastLaunchedAt: item.lastLaunchedAt,
-          );
+  Future<void> save(LibraryGame game, {bool preserveActivity = false}) =>
+      _mutate(() {
+        var updated = game;
+        if (preserveActivity) {
+          final existing = _items.where((item) => item.id == game.id).firstOrNull;
+          if (existing != null) {
+            updated = game.withLauncherActivity(
+              favorite: existing.favorite,
+              lastLaunchedAt: existing.lastLaunchedAt,
+            );
+          }
         }
-      }
-      return [..._items.where((g) => g.id != game.id), updated];
-    });
-  }
+        return [..._items.where((g) => g.id != game.id), updated];
+      });
 
   Future<void> remove(String id) =>
       _mutate(() => _items.where((g) => g.id != id).toList());
@@ -103,13 +102,10 @@ class LibraryService extends ChangeNotifier {
 
   Future<void> importGames(Iterable<LibraryGame> games) {
     final incoming = games.toList();
-    for (final game in incoming) {
-      LibraryGame.fromJson(game.toJson());
-    }
     return _mutate(() {
       final next = [..._items];
-      final ids = next.map((g) => g.id).toSet();
-      final targets = next.map((g) => g.target).toSet();
+      final ids = {for (final g in next) g.id};
+      final targets = {for (final g in next) g.target};
       for (final game in incoming) {
         if (!ids.contains(game.id) && !targets.contains(game.target)) {
           next.add(game);

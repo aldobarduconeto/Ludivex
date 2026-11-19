@@ -167,18 +167,22 @@ foreach ($rdev in $regDevices) {
 ConvertTo-Json -InputObject @($items.ToArray()) -Depth 4 -Compress
 ''';
 
+final _encodedWindowsBluetoothScript = base64Encode(
+  windowsBluetoothScript.codeUnits.expand((c) => [c & 255, c >> 8]).toList(),
+);
+
+final _batteryRegex = RegExp(r'Battery Percentage: \(0x[0-9a-fA-F]+\) (\d+)');
+final _mfgRegex = RegExp(r'Manufacturer: (.+)');
+
 Future<List<GamingDevice>> scan() async {
   if (Platform.isLinux) return _linuxDevices();
   if (!supported) {
     throw UnsupportedError('Detecção disponível no Android e Windows.');
   }
-  final code = base64Encode(
-    windowsBluetoothScript.codeUnits.expand((c) => [c & 255, c >> 8]).toList(),
-  );
   final root = Platform.environment['SystemRoot'] ?? r'C:\Windows';
   final process = await Process.start(
     '$root\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
-    ['-NoProfile', '-NonInteractive', '-EncodedCommand', code],
+    ['-NoProfile', '-NonInteractive', '-EncodedCommand', _encodedWindowsBluetoothScript],
   );
   final output = process.stdout.transform(utf8.decoder).join();
   final errors = process.stderr.transform(utf8.decoder).join();
@@ -245,10 +249,9 @@ Future<List<GamingDevice>> _linuxDevices() async {
       var manufacturer = '';
       if (info.exitCode == 0) {
         final infoOut = info.stdout as String;
-        final match = RegExp(r'Battery Percentage: \(0x[0-9a-fA-F]+\) (\d+)')
-            .firstMatch(infoOut);
+        final match = _batteryRegex.firstMatch(infoOut);
         if (match != null) battery = int.tryParse(match.group(1)!);
-        final mfgMatch = RegExp(r'Manufacturer: (.+)').firstMatch(infoOut);
+        final mfgMatch = _mfgRegex.firstMatch(infoOut);
         if (mfgMatch != null) manufacturer = mfgMatch.group(1)!.trim();
       }
       devices.add(

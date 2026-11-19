@@ -87,15 +87,16 @@ GameScanResult parseWindowsGameScan(String output) {
   return GameScanResult(games.values.toList(), warnings: warnings.toList());
 }
 
+final _encodedWindowsGameScanScript = base64Encode(
+  windowsGameScanScript.codeUnits.expand((c) => [c & 255, c >> 8]).toList(),
+);
+
 Future<GameScanResult> scanWindowsGames() async {
   if (!Platform.isWindows) return const GameScanResult([]);
-  final encoded = base64Encode(
-    windowsGameScanScript.codeUnits.expand((c) => [c & 255, c >> 8]).toList(),
-  );
   final systemRoot = Platform.environment['SystemRoot'] ?? r'C:\Windows';
   final process = await Process.start(
     '$systemRoot\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
-    ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded],
+    ['-NoProfile', '-NonInteractive', '-EncodedCommand', _encodedWindowsGameScanScript],
   );
   final output = process.stdout.transform(utf8.decoder).join();
   final errors = process.stderr.transform(utf8.decoder).join();

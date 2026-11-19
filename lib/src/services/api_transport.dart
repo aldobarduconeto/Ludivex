@@ -31,6 +31,19 @@ class ApiTransport {
   static const minimumRefresh = Duration(minutes: 1);
   static const maxRequestsPerHost = 12;
   static const maxCacheBytes = 8 * 1024 * 1024;
+  static final _imfFixdateRegex = RegExp(
+    r'^\w{3}, (\d{2}) (\w{3}) (\d{4}) (\d{2}):(\d{2}):(\d{2}) GMT$',
+  );
+  static const _redirectHosts = {
+    'www.nuuvem.com',
+    'store.ubisoft.com',
+    'www.ea.com',
+    'www.nintendo.com',
+    'www.xbox.com',
+    'store.playstation.com',
+    'www.sony.com',
+  };
+  static final _secureRandom = Random.secure();
   final _cache = LinkedHashMap<Uri, _Response>();
   final _pending = <Uri, Future<Map<String, dynamic>>>{};
   final _hostCalls = <String, List<DateTime>>{};
@@ -76,11 +89,11 @@ class ApiTransport {
   }
 
   Future<void> _acquire() async {
-    if (_active < 2) {
+    if (_active < 6) {
       _active++;
       return;
     }
-    if (_waiting.length >= 20)
+    if (_waiting.length >= 40)
       throw ApiDeferred(
         _now().add(minimumRefresh),
         'Muitas consultas em andamento',
@@ -152,17 +165,7 @@ class ApiTransport {
                 abortTrigger: abort.future,
               )
               ..headers['Accept'] = 'application/json, text/html;q=0.9'
-              ..followRedirects =
-                  body == null &&
-                  const {
-                    'www.nuuvem.com',
-                    'store.ubisoft.com',
-                    'www.ea.com',
-                    'www.nintendo.com',
-                    'www.xbox.com',
-                    'store.playstation.com',
-                    'www.sony.com',
-                  }.contains(uri.host)
+              ..followRedirects = body == null && _redirectHosts.contains(uri.host)
               ..maxRedirects = 3;
         if (uri.host == 'web.np.playstation.com') {
           request.headers['apollo-require-preflight'] = 'true';
@@ -174,8 +177,12 @@ class ApiTransport {
         }
         if (uri.host == 'emerald.xboxservices.com') {
           request.headers['x-ms-api-version'] = '1.1';
+          final randomBytes = Uint8List(16);
+          for (var i = 0; i < 16; i++) {
+            randomBytes[i] = _secureRandom.nextInt(256);
+          }
           request.headers['MS-CV'] =
-              '${base64Encode(List.generate(16, (_) => Random.secure().nextInt(256))).replaceAll('=', '')}.0';
+              '${base64Encode(randomBytes).replaceAll('=', '')}.0';
         }
         if (uri.host == 'service-aggregation-layer.juno.ea.com') {
           request.headers['x-client-id'] = 'eacom-fe';
@@ -259,9 +266,7 @@ class ApiTransport {
     if (seconds != null && seconds >= 0)
       return _now().add(Duration(seconds: seconds));
     // IMF-fixdate, used by Retry-After: Wed, 21 Oct 2026 07:28:00 GMT.
-    final parts = RegExp(
-      r'^\w{3}, (\d{2}) (\w{3}) (\d{4}) (\d{2}):(\d{2}):(\d{2}) GMT$',
-    ).firstMatch(value.trim());
+    final parts = _imfFixdateRegex.firstMatch(value.trim());
     if (parts == null) return null;
     const months = [
       'Jan',
