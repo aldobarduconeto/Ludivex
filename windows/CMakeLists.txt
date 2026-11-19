@@ -73,6 +73,12 @@ add_subdirectory("runner")
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+# Keep the plugin's legacy C++/WinRT coroutines building with newer MSVC.
+if(MSVC AND TARGET webview_all_windows_plugin)
+  target_compile_definitions(webview_all_windows_plugin PRIVATE
+    _SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
+endif()
+
 
 # === Installation ===
 # Support files are copied into place next to the executable, so that it can
