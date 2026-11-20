@@ -6,8 +6,22 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/game_deal.dart';
 import '../../models/store_region.dart';
 import '../../services/preferences_store.dart';
+import 'app_navigation.dart';
 
 enum DealSort { discount, lowestPrice, title }
+
+enum AppStartPage {
+  discover(0, 'Descobrir'),
+  wishlist(1, 'Lista de desejos'),
+  library(3, 'Biblioteca'),
+  devices(devicesTabIndex, 'Dispositivos'),
+  news(newsTabIndex, 'Notícias');
+
+  const AppStartPage(this.tabIndex, this.label);
+
+  final int tabIndex;
+  final String label;
+}
 
 enum AppThemePreference {
   system,
@@ -62,6 +76,15 @@ class AppPreferences extends ChangeNotifier {
       bluetoothAutoScan = true,
       libraryAutoScan = true;
   AppThemePreference themePreference = AppThemePreference.dark;
+  Color? accentColor;
+  static const textSizes = {
+    0: 'Do sistema',
+    100: '100%',
+    115: '115%',
+    130: '130%',
+  };
+  int textSize = 0;
+  AppStartPage startPage = AppStartPage.discover;
 
   ThemeMode get themeMode => switch (themePreference) {
     AppThemePreference.system => ThemeMode.system,
@@ -200,6 +223,18 @@ class AppPreferences extends ChangeNotifier {
       };
     }
 
+    final accent = data['accentColor'];
+    accentColor = accent is int && accent >= 0 && accent <= 0xFFFFFF
+        ? Color(0xFF000000 | accent)
+        : null;
+    final size = data['textSize'];
+    textSize = size is int && textSizes.containsKey(size) ? size : 0;
+    startPage =
+        AppStartPage.values
+            .where((page) => page.name == data['startPage'])
+            .firstOrNull ??
+        AppStartPage.discover;
+
     sort =
         DealSort.values.where((s) => s.name == data['sort']).firstOrNull ??
         DealSort.discount;
@@ -242,6 +277,9 @@ class AppPreferences extends ChangeNotifier {
       'refreshMinutes': refreshMinutes,
       'theme': themeMode.name,
       'themePreference': themePreference.name,
+      'accentColor': accentColor?.toARGB32().toUnsigned(24),
+      'textSize': textSize,
+      'startPage': startPage.name,
       'oledWhenDark': oledWhenDark,
       'bluetoothAutoScan': bluetoothAutoScan,
       'libraryAutoScan': libraryAutoScan,

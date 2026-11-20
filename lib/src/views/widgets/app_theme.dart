@@ -3,14 +3,14 @@ import 'package:flutter/material.dart';
 abstract final class LudivexTheme {
   static const accent = Color(0xFFBCACFF);
 
-  static ThemeData buildLight() => build(Brightness.light);
-  static ThemeData buildDark() => build(Brightness.dark, oled: false);
-  static ThemeData buildOled() => build(Brightness.dark, oled: true);
-
-  static ThemeData build(Brightness brightness, {bool oled = false}) {
+  static ThemeData build(
+    Brightness brightness, {
+    bool oled = false,
+    Color? accentColor,
+  }) {
     final dark = brightness == Brightness.dark;
     final isOled = dark && oled;
-    final colors = ColorScheme.fromSeed(
+    var colors = ColorScheme.fromSeed(
       seedColor: const Color(0xFF7957DC),
       brightness: brightness,
       primary: dark ? accent : const Color(0xFF5733AD),
@@ -52,6 +52,18 @@ abstract final class LudivexTheme {
           ? const Color(0xFF100F15)
           : (dark ? const Color(0xFF262332) : const Color(0xFFEBE6F3)),
     );
+    if (accentColor != null) {
+      final palette = ColorScheme.fromSeed(
+        seedColor: accentColor,
+        brightness: brightness,
+      );
+      colors = colors.copyWith(
+        primary: palette.primary,
+        onPrimary: palette.onPrimary,
+        primaryContainer: palette.primaryContainer,
+        onPrimaryContainer: palette.onPrimaryContainer,
+      );
+    }
     final base = ThemeData(
       useMaterial3: true,
       brightness: brightness,

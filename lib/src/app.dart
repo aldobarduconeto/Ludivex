@@ -60,7 +60,8 @@ class _AppState extends State<App> with WidgetsBindingObserver {
   DateTime? _filteredUntil;
   String? _error;
   String _query = '';
-  int _tab = 0, _requestId = 0;
+  late int _tab;
+  int _requestId = 0;
   GamePlatform? _filter;
   XboxCompatibility? _xboxCompatibility;
   bool _onlyFreeHub = false;
@@ -99,9 +100,22 @@ class _AppState extends State<App> with WidgetsBindingObserver {
   final _offersAnchor = GlobalKey();
   final _campaignPager = PageController();
   final _campaignPage = ValueNotifier<int>(0);
-  late final _lightTheme = LudivexTheme.buildLight();
-  late final _darkTheme = LudivexTheme.buildDark();
-  late final _oledTheme = LudivexTheme.buildOled();
+  late ThemeData _lightTheme, _darkTheme, _oledTheme;
+  Color? _themeAccent;
+
+  void _updateThemes() {
+    _themeAccent = _prefs.accentColor;
+    _lightTheme = LudivexTheme.build(
+      Brightness.light,
+      accentColor: _themeAccent,
+    );
+    _darkTheme = LudivexTheme.build(Brightness.dark, accentColor: _themeAccent);
+    _oledTheme = LudivexTheme.build(
+      Brightness.dark,
+      oled: true,
+      accentColor: _themeAccent,
+    );
+  }
 
   ThemeData get _activeDarkTheme {
     if (_prefs.themePreference == AppThemePreference.oled) {
@@ -119,6 +133,8 @@ class _AppState extends State<App> with WidgetsBindingObserver {
     super.initState();
     _api = widget.api ?? DealsApi.instance;
     _wishlist = widget.wishlist ?? WishlistService.instance;
+    _tab = _prefs.startPage.tabIndex;
+    _updateThemes();
     _displayPageSize = _visibleLimit = _prefs.individualOfferCount;
     _prefs.addListener(_preferencesChanged);
     _wishlist.addListener(_changed);
@@ -147,6 +163,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
   }
 
   void _preferencesChanged() {
+    if (_themeAccent != _prefs.accentColor) _updateThemes();
     if (_displayPageSize != _prefs.individualOfferCount) {
       _displayPageSize = _visibleLimit = _prefs.individualOfferCount;
     }
@@ -521,46 +538,14 @@ class _AppState extends State<App> with WidgetsBindingObserver {
     darkTheme: _activeDarkTheme,
     themeMode: _prefs.themeMode,
     builder: (context, child) {
-      if (!hasDesktopTopBar || child == null) return child ?? const SizedBox();
-      final library = LibraryService.instance;
-      return NotificationListener<NavigationNotification>(
-        onNotification: (notification) {
-          final routeOpen = _navigator.currentState?.canPop() ?? false;
-          if (_desktopRouteOpen != routeOpen) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) setState(() => _desktopRouteOpen = routeOpen);
-            });
-          }
-          return false;
-        },
-        child: ListenableBuilder(
-          listenable: library,
-          builder: (context, _) => DesktopTopBar(
-            onStores: _desktopRouteOpen
-                ? null
-                : () {
-                    final navigator = _navigator.currentState;
-                    if (navigator == null || navigator.canPop()) return;
-                    navigator.push<void>(
-                      MaterialPageRoute(
-                        builder: (_) => StoreScreen(library: library),
-                      ),
-                    );
-                  },
-            onRandomGame: _desktopRouteOpen || library.items.isEmpty
-                ? null
-                : () {
-                    final navigator = _navigator.currentState;
-                    if (navigator == null || navigator.canPop()) return;
-                    GameRouletteDialog.show(
-                      navigator.overlay!.context,
-                      library.items,
-                    );
-                  },
-            onRefresh: _loading ? null : () => _refresh(force: true),
-            child: child,
-          ),
-        ),
+      final media = MediaQuery.of(context);
+      return MediaQuery(
+        data: _prefs.textSize == 0
+            ? media
+            : media.copyWith(
+                textScaler: TextScaler.linear(_prefs.textSize / 100),
+              ),
+        child: Builder(builder: (context) => _buildAppFrame(context, child)),
       );
     },
     home: Builder(
@@ -713,6 +698,51 @@ class _AppState extends State<App> with WidgetsBindingObserver {
       ),
     ),
   );
+
+  Widget _buildAppFrame(BuildContext context, Widget? child) {
+    if (!hasDesktopTopBar || child == null) return child ?? const SizedBox();
+    final library = LibraryService.instance;
+    return NotificationListener<NavigationNotification>(
+      onNotification: (notification) {
+        final routeOpen = _navigator.currentState?.canPop() ?? false;
+        if (_desktopRouteOpen != routeOpen) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) setState(() => _desktopRouteOpen = routeOpen);
+          });
+        }
+        return false;
+      },
+      child: ListenableBuilder(
+        listenable: library,
+        builder: (context, _) => DesktopTopBar(
+          onStores: _desktopRouteOpen
+              ? null
+              : () {
+                  final navigator = _navigator.currentState;
+                  if (navigator == null || navigator.canPop()) return;
+                  navigator.push<void>(
+                    MaterialPageRoute(
+                      builder: (_) => StoreScreen(library: library),
+                    ),
+                  );
+                },
+          onRandomGame: _desktopRouteOpen || library.items.isEmpty
+              ? null
+              : () {
+                  final navigator = _navigator.currentState;
+                  if (navigator == null || navigator.canPop()) return;
+                  GameRouletteDialog.show(
+                    navigator.overlay!.context,
+                    library.items,
+                  );
+                },
+          onRefresh: _loading ? null : () => _refresh(force: true),
+          child: child,
+        ),
+      ),
+    );
+  }
+
   List<GameDeal> _visible() {
     final now = DateTime.now();
     final key =

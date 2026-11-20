@@ -36,6 +36,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _form = GlobalKey<FormState>();
   late final Map<GamePlatform, TextEditingController> _urls;
   late final TextEditingController _xbox;
+  late final TextEditingController _accent;
+  late int _textSize;
+  late AppStartPage _startPage;
   late Set<GamePlatform> _stores;
   late int _discount, _alertDiscount, _minutes;
   late int _offerCount;
@@ -65,6 +68,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         p: TextEditingController(text: _prefs.apiUrls[p] ?? ''),
     };
     _xbox = TextEditingController(text: _prefs.xboxProductIds.join(', '));
+    final accent = _prefs.accentColor;
+    _accent = TextEditingController(
+      text: accent == null
+          ? ''
+          : '#${accent.toARGB32().toUnsigned(24).toRadixString(16).padLeft(6, '0').toUpperCase()}',
+    );
+    _textSize = _prefs.textSize;
+    _startPage = _prefs.startPage;
     _stores = {..._prefs.platforms};
     _region = _prefs.region;
     _discount = _prefs.minimumDiscount;
@@ -91,6 +102,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       controller.dispose();
     }
     _xbox.dispose();
+    _accent.dispose();
     super.dispose();
   }
 
@@ -146,6 +158,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ..bluetoothAutoScan = _bluetoothAuto
         ..libraryAutoScan = _libraryAuto
         ..themePreference = _themePreference
+        ..accentColor = _parseAccent(_accent.text)
+        ..textSize = _textSize
+        ..startPage = _startPage
         ..sort = _sort
         ..apiUrls = {
           for (final entry in _urls.entries)
@@ -162,6 +177,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) setState(() => _busy = false);
     }
   }
+
+  Color? _parseAccent(String text) {
+    final hex = text.trim().replaceFirst(RegExp(r'^#'), '');
+    if (!RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(hex)) return null;
+    return Color(0xFF000000 | int.parse(hex, radix: 16));
+  }
+
+  void _resetAppearance() => setState(() {
+    _themePreference = AppThemePreference.dark;
+    _oledWhenDark = false;
+    _accent.clear();
+    _textSize = 0;
+    _startPage = AppStartPage.discover;
+    _compact = false;
+  });
 
   Future<void> _test(GamePlatform platform) async {
     if (!_form.currentState!.validate()) return;
@@ -250,12 +280,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               borderRadius: BorderRadius.circular(16),
               onTap: _busy
                   ? null
-                  : () {
-                      setState(() {
-                        _themePreference = pref;
-                        _prefs.themePreference = pref;
-                      });
-                    },
+                  : () => setState(() => _themePreference = pref),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.all(16),
@@ -541,22 +566,83 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       'Preto Puro (OLED) no modo escuro do sistema',
                       'Quando o sistema operacional estiver no modo escuro, utiliza o tema preto absoluto #000000 em vez do cinza escuro.',
                       _oledWhenDark,
-                      _busy
-                          ? null
-                          : (v) {
-                              setState(() {
-                                _oledWhenDark = v;
-                                _prefs.oledWhenDark = v;
-                              });
-                            },
+                      _busy ? null : (v) => setState(() => _oledWhenDark = v),
                     ),
                   ],
                   const Divider(height: 28),
+                  TextFormField(
+                    controller: _accent,
+                    enabled: !_busy,
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      labelText: 'Cor de destaque',
+                      hintText: '#7957DC',
+                      helperText: 'Deixe em branco para usar a cor padrão.',
+                      suffixIcon: Icon(
+                        Icons.circle,
+                        color: _parseAccent(_accent.text) ??
+                            Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    validator: (value) {
+                      final text = value?.trim() ?? '';
+                      return text.isEmpty || _parseAccent(text) != null
+                          ? null
+                          : 'Informe seis dígitos hexadecimais, como #7957DC.';
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<int>(
+                    key: ValueKey(_textSize),
+                    initialValue: _textSize,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Tamanho do texto',
+                    ),
+                    items: [
+                      for (final size in AppPreferences.textSizes.entries)
+                        DropdownMenuItem(
+                          value: size.key,
+                          child: Text(size.value),
+                        ),
+                    ],
+                    onChanged: _busy
+                        ? null
+                        : (value) {
+                            if (value != null)
+                              setState(() => _textSize = value);
+                          },
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<AppStartPage>(
+                    key: ValueKey(_startPage),
+                    initialValue: _startPage,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Tela inicial',
+                      helperText: 'Usada na próxima abertura do aplicativo.',
+                    ),
+                    items: [
+                      for (final page in AppStartPage.values)
+                        DropdownMenuItem(value: page, child: Text(page.label)),
+                    ],
+                    onChanged: _busy
+                        ? null
+                        : (value) {
+                            if (value != null)
+                              setState(() => _startPage = value);
+                          },
+                  ),
+                  const SizedBox(height: 12),
                   _switch(
                     'Cartões compactos de ofertas',
                     'Reduz o espaçamento dos cards para exibir mais jogos simultaneamente na grade.',
                     _compact,
                     _busy ? null : (v) => setState(() => _compact = v),
+                  ),
+                  TextButton(
+                    onPressed: _busy ? null : _resetAppearance,
+                    child: const Text('Restaurar aparência padrão'),
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<GamePlatform>(
