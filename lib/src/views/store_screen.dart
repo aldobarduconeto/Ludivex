@@ -25,6 +25,7 @@ class _StoreScreenState extends State<StoreScreen> {
   final _legendary = TextEditingController();
   final _gogdl = TextEditingController();
   final _nile = TextEditingController();
+  final _ea = TextEditingController();
   final _folder = TextEditingController();
   final _wine = TextEditingController();
   final _umu = TextEditingController();
@@ -61,6 +62,7 @@ class _StoreScreenState extends State<StoreScreen> {
       _legendary.text = settings.legendary;
       _gogdl.text = settings.gogdl;
       _nile.text = settings.nile;
+      _ea.text = settings.ea;
       _folder.text = settings.installFolder;
       _wine.text = settings.wine;
       _umu.text = settings.umu;
@@ -79,6 +81,7 @@ class _StoreScreenState extends State<StoreScreen> {
     _legendary.dispose();
     _gogdl.dispose();
     _nile.dispose();
+    _ea.dispose();
     _folder.dispose();
     _wine.dispose();
     _umu.dispose();
@@ -94,6 +97,7 @@ class _StoreScreenState extends State<StoreScreen> {
         : _legendary.text.trim(),
     gogdl: _gogdl.text.trim().isEmpty ? 'gogdl' : _gogdl.text.trim(),
     nile: _nile.text.trim().isEmpty ? 'nile' : _nile.text.trim(),
+    ea: _ea.text.trim().isEmpty ? 'EADesktop.exe' : _ea.text.trim(),
     installFolder: _folder.text.trim(),
     wine: _wine.text.trim().isEmpty ? 'wine' : _wine.text.trim(),
     umu: _umu.text.trim().isEmpty ? 'umu-run' : _umu.text.trim(),
@@ -259,6 +263,7 @@ class _StoreScreenState extends State<StoreScreen> {
                             StoreProvider.epic => _legendary,
                             StoreProvider.gog => _gogdl,
                             StoreProvider.amazon => _nile,
+                            StoreProvider.ea => _ea,
                           }, 'Executável · ${_provider.backend}'),
                           _field(_folder, 'Pasta de instalação (opcional)'),
                           const SizedBox(height: 12),

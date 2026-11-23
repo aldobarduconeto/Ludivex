@@ -441,6 +441,44 @@ class StoreProviders {
           ? null
           : GameDeal.fromJson({...parsed, 'platform': 'epic'});
     }
+    if (platform == GamePlatform.ea) {
+      try {
+        final slug = productId.startsWith('ea_')
+            ? productId.substring(3)
+            : productId;
+        final result = await request(
+          Uri.https('service-aggregation-layer.juno.ea.com', '/graphql'),
+          body: {
+            'query':
+                'query ludivexPrice { game(slug: ${jsonEncode(slug)}, locale: "${region.locale}") { title lowestPriceGameProduct { anonymousOffer(overrideCountryCode: "${region.country}", subscriptionLevel: NON_SUBSCRIBER) { lowestPricePurchaseOption { displayOriginalTotal displayTotalWithDiscount currency } } } } }'
+          },
+        );
+        final game = result['data']?['game'];
+        final price =
+            game?['lowestPriceGameProduct']?['anonymousOffer']?['lowestPricePurchaseOption'];
+        if (price is Map &&
+            region.allowedCurrencies.contains(price['currency'])) {
+          final current =
+              region.parsePrice(price['displayTotalWithDiscount'] as String?);
+          final original =
+              region.parsePrice(price['displayOriginalTotal'] as String?);
+          if (current != null && original != null && current >= 0 && current <= original) {
+            final title = (game['title'] as String?)?.trim();
+            return GameDeal.fromJson({
+              'id': slug,
+              'platform': 'ea',
+              'title': title != null && title.isNotEmpty ? title : slug,
+              'currentPrice': current,
+              'originalPrice': original,
+              'currency': price['currency'],
+              'storeUrl':
+                  'https://www.ea.com/${region.lowerLocale}/games/$slug',
+              'source': 'EA Store · ${region.label}',
+            });
+          }
+        }
+      } catch (_) {}
+    }
 
     return (await collect(
       platform,

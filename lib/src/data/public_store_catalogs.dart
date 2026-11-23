@@ -274,21 +274,45 @@ class PublicStoreCatalogs {
   }
 
   Future<DealPage> _ea(int index, String query, bool discountedOnly) async {
-    final source = await _html(
+    String source = '';
+    final endpoints = [
       Uri.https('www.ea.com', '/${region.lowerLocale}/sales/deals'),
-    );
+      Uri.https('www.ea.com', '/${region.lowerLocale}/deals'),
+      Uri.https('www.ea.com', '/deals'),
+      Uri.https('www.ea.com', '/${region.lowerLocale}/sales'),
+    ];
+    for (final uri in endpoints) {
+      try {
+        source = await _html(uri);
+        if (source.contains('game-slug') || source.contains('/games/')) {
+          break;
+        }
+      } catch (_) {}
+    }
+    if (source.isEmpty) {
+      source = await _html(
+        Uri.https('www.ea.com', '/${region.lowerLocale}/sales/deals'),
+      );
+    }
     final document = html.parse(source);
     final games = <String, Map<String, String>>{};
-    for (final tile in document.querySelectorAll(
-      'ea-hybrid-themedsale-product[game-slug]',
-    )) {
-      final slug = tile.attributes['game-slug']!;
-      final title = tile.attributes['title-text']?.trim() ?? '';
-      if (!RegExp(r'^[a-z0-9-]+$').hasMatch(slug) || title.isEmpty) continue;
+    final tiles = document.querySelectorAll(
+      'ea-hybrid-themedsale-product[game-slug], [game-slug], ea-tile[game-slug], [data-game-slug]',
+    );
+    for (final tile in tiles) {
+      final slug = tile.attributes['game-slug'] ?? tile.attributes['data-game-slug'];
+      if (slug == null || !RegExp(r'^[a-z0-9-]+$').hasMatch(slug)) continue;
+      var title = tile.attributes['title-text']?.trim() ??
+          tile.attributes['title']?.trim() ??
+          tile.querySelector('h3, h2, [slot="title"]')?.text.trim() ??
+          tile.querySelector('img')?.attributes['alt']?.trim() ??
+          '';
+      if (title.isEmpty) title = slug;
       if (query.isNotEmpty &&
           !title.toLowerCase().contains(query.toLowerCase()) &&
-          slug != query)
+          slug != query) {
         continue;
+      }
       String? link;
       for (final element in document.querySelectorAll('[link-url], a[href]')) {
         final raw =
@@ -301,16 +325,23 @@ class PublicStoreCatalogs {
           break;
         }
       }
-      if (link == null) continue;
+      link ??= 'https://www.ea.com/${region.lowerLocale}/games/$slug';
+      final img = tile.querySelector('img');
+      final image = img?.attributes['data-src'] ??
+          img?.attributes['src'] ??
+          img?.attributes['data-responsive-image-src'] ??
+          '';
       games[slug] = {
         'title': title,
         'url': link,
-        'image': tile.querySelector('img')?.attributes['data-src'] ?? '',
+        'image': image,
       };
     }
     if (games.isEmpty &&
-        document.querySelector('ea-hybrid-themedsale-product') == null)
+        document.querySelector('ea-hybrid-themedsale-product') == null &&
+        document.querySelector('[game-slug]') == null) {
       throw const FormatException('Catálogo EA indisponível');
+    }
     const count = 12;
     final entries = games.entries.skip(index * count).take(count).toList();
     if (entries.isEmpty) return const DealPage([]);
@@ -324,16 +355,18 @@ class PublicStoreCatalogs {
       Uri.https('service-aggregation-layer.juno.ea.com', '/graphql'),
       body: {'query': 'query ludivexPrices { ${fields.join(' ')} }'},
     );
-    if (result['data'] is! Map)
+    if (result['data'] is! Map) {
       throw const FormatException('Preços públicos EA indisponíveis');
+    }
     final deals = <GameDeal>[];
     var quoted = 0;
     for (var i = 0; i < entries.length; i++) {
       final price =
           result['data']['g$i']?['lowestPriceGameProduct']?['anonymousOffer']?['lowestPricePurchaseOption'];
       if (price is! Map ||
-          !region.allowedCurrencies.contains(price['currency']))
+          !region.allowedCurrencies.contains(price['currency'])) {
         continue;
+      }
       final current = region.parsePrice(
         price['displayTotalWithDiscount'] as String?,
       );
@@ -343,8 +376,9 @@ class PublicStoreCatalogs {
       if (current == null ||
           original == null ||
           current < 0 ||
-          current > original)
+          current > original) {
         continue;
+      }
       quoted++;
       final game = entries[i];
       final deal = GameDeal.fromJson({
@@ -358,13 +392,15 @@ class PublicStoreCatalogs {
         'storeUrl': game.value['url'],
         'source': 'EA Store · ${region.label}',
       });
-      if (!deal.isExpired && (!discountedOnly || deal.discount > 0))
+      if (!deal.isExpired && (!discountedOnly || deal.discount > 0)) {
         deals.add(deal);
+      }
     }
-    if (quoted == 0)
+    if (quoted == 0 && entries.isNotEmpty && index == 0) {
       throw FormatException(
         'A EA não disponibilizou preços para ${region.label}',
       );
+    }
     return DealPage(
       deals,
       nextCursor: (index + 1) * count < games.length ? '${index + 1}' : null,

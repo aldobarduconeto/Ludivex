@@ -200,7 +200,7 @@ class _WelcomeDialogState extends State<WelcomeDialog> {
                             iconColor: Color(0xFF3988FF),
                             title: 'Todas as Lojas Reunidas',
                             description:
-                                'Acompanhe promoções em tempo real da Steam, PlayStation, Xbox, Epic Games e Nuuvem em um catálogo unificado.',
+                                'Acompanhe promoções em tempo real da Steam, PlayStation, Xbox, Epic Games, EA e Nuuvem em um catálogo unificado.',
                           ),
                           const SizedBox(height: 12),
                           const _FeatureHighlight(

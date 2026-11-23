@@ -50,6 +50,12 @@ Future<void> deleteStoreFile(String path) async {
   if (await file.exists()) await file.delete();
 }
 
+Future<void> writeStoreFile(String path, String content) async {
+  final file = File(path);
+  await file.parent.create(recursive: true);
+  await file.writeAsString(content);
+}
+
 Future<List<String>> storeSubdirectories(String path) async {
   final directory = Directory(path);
   if (!await directory.exists()) return [];

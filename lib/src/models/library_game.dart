@@ -13,7 +13,7 @@ class LibraryGame {
   final bool local;
   static ({String store, String id})? storeTarget(String target) {
     final match = RegExp(
-      r'^ludivex-(epic|gog|amazon)://([A-Za-z0-9_][A-Za-z0-9_.-]*)$',
+      r'^ludivex-(epic|gog|amazon|ea)://([A-Za-z0-9_][A-Za-z0-9_.-]*)$',
     ).firstMatch(target);
     if (match == null) return null;
     return (store: match[1]!, id: match[2]!);

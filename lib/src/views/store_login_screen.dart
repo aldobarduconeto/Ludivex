@@ -65,7 +65,14 @@ class _StoreLoginScreenState extends State<StoreLoginScreen> {
             final code = _redirectCode(uri);
             if (code != null) _finish(code);
           },
-          onPageFinished: (url) => _readEpicResponse(controller, url),
+          onPageFinished: (url) {
+            final uri = Uri.tryParse(url);
+            if (uri != null) {
+              final code = _redirectCode(uri);
+              if (code != null) _finish(code);
+            }
+            _readEpicResponse(controller, url);
+          },
           onProgress: (value) {
             if (mounted && !_finished) setState(() => _progress = value);
           },
@@ -93,6 +100,16 @@ class _StoreLoginScreenState extends State<StoreLoginScreen> {
       StoreProvider.amazon
           when (uri.host == 'www.amazon.com' || uri.host == 'amazon.com') =>
         uri.queryParameters['openid.oa2.authorization_code'],
+      StoreProvider.ea
+          when (uri.host == 'www.ea.com' ||
+                  uri.host == 'ea.com' ||
+                  uri.host == 'accounts.ea.com') =>
+        uri.queryParameters['code'] ??
+            (uri.fragment.contains('code=')
+                ? Uri.splitQueryString(uri.fragment)['code']
+                : (uri.fragment.contains('access_token=')
+                    ? Uri.splitQueryString(uri.fragment)['access_token']
+                    : null)),
       _ => null,
     };
   }

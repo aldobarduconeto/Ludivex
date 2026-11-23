@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 
 import 'preferences_store.dart';
 import 'store_process_stub.dart' if (dart.library.io) 'store_process_io.dart';
@@ -19,6 +20,7 @@ class LauncherSettings {
     this.legendary = 'legendary',
     this.gogdl = 'gogdl',
     this.nile = 'nile',
+    this.ea = 'EADesktop.exe',
     this.installFolder = '',
     this.runtime = GameRuntime.system,
     this.wine = 'wine',
@@ -27,7 +29,7 @@ class LauncherSettings {
     this.prefix = '',
   });
 
-  final String gogdl, nile;
+  final String gogdl, nile, ea;
   final String legendary, installFolder, wine, umu, proton, prefix;
   final GameRuntime runtime;
   static const _key = 'launcher.settings.v1';
@@ -49,6 +51,7 @@ class LauncherSettings {
       legendary: json['legendary'] as String,
       gogdl: json['gogdl'] as String? ?? 'gogdl',
       nile: json['nile'] as String? ?? 'nile',
+      ea: json['ea'] as String? ?? 'EADesktop.exe',
       installFolder: json['installFolder'] as String,
       runtime: GameRuntime.values.byName(json['runtime'] as String),
       wine: json['wine'] as String,
@@ -68,6 +71,7 @@ class LauncherSettings {
           'legendary': legendary,
           'gogdl': gogdl,
           'nile': nile,
+          'ea': ea,
           'installFolder': installFolder,
           'runtime': runtime.name,
           'wine': wine,

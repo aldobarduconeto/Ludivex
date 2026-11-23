@@ -1,6 +1,6 @@
 # Ludivex
 
-Ludivex é um aplicativo Flutter para descobrir ofertas de jogos de PC e consoles, acompanhar preços e organizar uma biblioteca de jogos. Nos aplicativos desktop, também funciona como launcher para jogos locais e de contas Epic Games, GOG e Amazon Games.
+Ludivex é um aplicativo Flutter para descobrir ofertas de jogos de PC e consoles, acompanhar preços e organizar uma biblioteca de jogos. Nos aplicativos desktop, também funciona como launcher para jogos locais e de contas Epic Games, GOG, Amazon Games e EA.
 
 ![Tela Descobrir com ofertas de jogos](docs/screenshots/descobrir.png)
 
@@ -48,6 +48,7 @@ Abra **Biblioteca → Lojas e compatibilidade** e selecione uma loja. Instale o 
 | Epic Games | [Legendary](https://github.com/legendary-gl/legendary) |
 | GOG | [gogdl](https://github.com/Heroic-Games-Launcher/heroic-gogdl) |
 | Amazon Games | [Nile](https://github.com/imLinguin/nile) |
+| EA | EA App / Origin |
 
 1. Escolha **Entrar** e autentique-se na página da loja dentro do Ludivex. Ao concluir, o app fecha a página e sincroniza os jogos da conta automaticamente. Use **Carregar jogos** para reaproveitar uma sessão existente.
 2. Escolha **Instalar** para baixar um jogo adquirido. O aplicativo adiciona a instalação à Biblioteca depois de confirmá-la. Use **Adicionar** quando uma instalação reconhecida já estiver disponível.
