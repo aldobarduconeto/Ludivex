@@ -83,26 +83,16 @@ class LibraryGameCard extends StatelessWidget {
         child: Column(
           children: [
             Ink(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [c.primaryContainer, c.surfaceContainerHigh],
-                ),
-              ),
+              color: c.surfaceContainerLow,
               child: Row(
                 children: [
                   Expanded(
                     child: InkWell(
                       onTap: onDetails,
                       child: SizedBox(
-                        height: 92,
+                        height: 60,
                         child: Center(
-                          child: Icon(
-                            icon,
-                            color: c.onPrimaryContainer,
-                            size: 42,
-                          ),
+                          child: Icon(icon, color: c.primary, size: 28),
                         ),
                       ),
                     ),

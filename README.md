@@ -65,6 +65,10 @@ Use **Verificar runtime** para verificar a configuração e **Salvar configuraç
 
 Em **Dispositivos**, use **Buscar dispositivos** ou cadastre um modelo manualmente. A leitura depende da plataforma, das permissões e dos dados expostos pelo aparelho. No iOS, a busca se limita a dispositivos BLE acessíveis e à saída de áudio Bluetooth em uso. Bateria e firmware aparecem quando o sistema consegue ler essas informações.
 
+No Windows, o Ludivex também lê o nível de bateria de controles e fones sem fio compatíveis com XInput. A tela **Dispositivos** consulta os dados ao abrir e a cada minuto enquanto estiver ativa.
+
+No Linux, a tela consulta o BlueZ e as baterias HID que o kernel publica para periféricos USB e Bluetooth. No Android, a atualização automática começa após a autorização de Bluetooth, e **Ler dados Bluetooth** consulta o serviço de bateria de acessórios BLE pareados. No iOS e no macOS, busque o periférico BLE e use **Ler dados Bluetooth** para consultar a carga que ele expõe. A saída de áudio em uso no iOS e os aparelhos Bluetooth clássicos listados no macOS podem aparecer sem porcentagem.
+
 **Verificar atualizações** consulta fontes públicas para modelos compatíveis e indica o caminho oficial quando a verificação depende de uma ferramenta do fabricante. A instalação de firmware é feita pelo software do fabricante.
 
 ## Desenvolver

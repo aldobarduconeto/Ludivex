@@ -95,7 +95,11 @@ class DeviceService extends ChangeNotifier {
       final scannedIds = {for (final s in scanned) s.id};
       await _save(
         () => [
-          ..._devices.where((d) => !scannedIds.contains(d.id)),
+          ..._devices.where(
+            (d) =>
+                !scannedIds.contains(d.id) &&
+                (d.manual || !d.id.startsWith('xinput:')),
+          ),
           ...scanned,
         ],
       );
@@ -103,8 +107,7 @@ class DeviceService extends ChangeNotifier {
         ..clear()
         ..addAll(scannedIds);
     } on Object {
-      error =
-          'Não foi possível consultar o Bluetooth. Confira se ele está ativado e com permissão.';
+      error = 'Não foi possível consultar o Bluetooth. Confira se ele está ativado e com permissão.';
     } finally {
       scanning = false;
       notifyListeners();

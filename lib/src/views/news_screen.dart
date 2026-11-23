@@ -203,7 +203,6 @@ class _NewsScreenState extends State<NewsScreen> {
           PageIntro(
             title: 'Notícias dos jogos',
             description: 'Selecione um jogo para ver as publicações da Steam.',
-            icon: Icons.newspaper_outlined,
             actions: [
               OutlinedButton.icon(
                 onPressed: _busy
@@ -301,12 +300,14 @@ class _NewsScreenState extends State<NewsScreen> {
                       ),
                     );
                   }
-                  return ListView.builder(
+                  return AdaptiveCollection(
                     key: ValueKey(_selected?.id),
+                    minColumnWidth: 360,
                     itemCount: articles.length,
                     itemBuilder: (context, index) {
                       final article = articles[index];
                       return Card(
+                        margin: const EdgeInsets.only(bottom: 10),
                         child: ListTile(
                           title: Text(article.title),
                           subtitle: Text(

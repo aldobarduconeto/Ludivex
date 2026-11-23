@@ -44,8 +44,11 @@ class MainFlutterWindow: NSWindow {
       result(nil)
     }
     let channel = FlutterMethodChannel(name: "ludivex/devices", binaryMessenger: flutterViewController.engine.binaryMessenger)
+    let lister = LudivexBluetoothLister()
     deviceChannel = channel
     channel.setMethodCallHandler { call, result in
+      if call.method == "readDetails" { lister.readDetails(call.arguments, result: result); return }
+      if call.method == "scanBle" { lister.scan(result); return }
       guard call.method == "scan" else { result(FlutterMethodNotImplemented); return }
       DispatchQueue.global(qos: .userInitiated).async {
         var devices: [[String: Any]] = []

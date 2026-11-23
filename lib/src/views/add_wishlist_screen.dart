@@ -1,12 +1,13 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
+
 import '../models/game_deal.dart';
 import '../models/platform.dart';
 import '../models/wishlist_item.dart';
 import '../services/deals_api.dart';
 import '../services/wishlist_service.dart';
 import 'widgets/app_preferences.dart';
-import 'widgets/page_components.dart';
 
 double? parseTargetPrice(String text) {
   final value = text.trim();
@@ -104,8 +105,7 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
       if (mounted && generation == _generation)
         setState(() {
           _results = [];
-          _error =
-              'Não foi possível buscar nas APIs selecionadas. Você pode adicionar pelo link.';
+          _error = 'Não foi possível buscar nas APIs selecionadas. Você pode adicionar pelo link.';
         });
     } finally {
       if (mounted && generation == _generation)
@@ -195,15 +195,6 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
                 MediaQuery.sizeOf(context).width < 600 ? 16 : 24,
               ),
               children: [
-                PageIntro(
-                  title: editing
-                      ? 'Acompanhe do seu jeito.'
-                      : 'Qual é o próximo jogo?',
-                  description:
-                      'Salve seus favoritos e defina o preço que você quer pagar. Tudo fica neste dispositivo.',
-                  icon: Icons.favorite_outline_rounded,
-                ),
-                const SizedBox(height: 24),
                 if (!editing && _selected == null) ...[
                   SegmentedButton<int>(
                     segments: const [
@@ -401,8 +392,7 @@ class _AddWishlistScreenState extends State<AddWishlistScreen> {
                       prefixText:
                           '${_selected?.currency ?? widget.item?.quote?.currency ?? AppPreferences.instance.region.currency} ',
                       hintText: '99,90',
-                      helperText:
-                          'Vazio: acompanhar quedas. Preenchido: avisar ao atingir esse valor.',
+                      helperText: 'Vazio: acompanhar quedas. Preenchido: avisar ao atingir esse valor.',
                     ),
                     validator: (value) {
                       try {

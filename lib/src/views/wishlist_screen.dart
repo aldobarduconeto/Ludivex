@@ -156,8 +156,9 @@ class _WishlistScreenState extends State<WishlistScreen> {
       for (final item in rawItems) {
         final q = item.quote;
         if (q != null) {
-          totalOriginal +=
-              q.originalPrice > 0 ? q.originalPrice : q.currentPrice;
+          totalOriginal += q.originalPrice > 0
+              ? q.originalPrice
+              : q.currentPrice;
           totalCurrent += q.currentPrice;
           if (q.discount > 0) {
             onSaleCount++;
@@ -166,356 +167,266 @@ class _WishlistScreenState extends State<WishlistScreen> {
       }
       final totalSavings = totalOriginal - totalCurrent;
       final items = rawItems
-          .where((item) =>
-              item.title.toLowerCase().contains(_query) &&
-              (!_onlyDiscounted ||
-                  (item.quote != null && item.quote!.discount > 0)))
+          .where(
+            (item) =>
+                item.title.toLowerCase().contains(_query) &&
+                (!_onlyDiscounted ||
+                    (item.quote != null && item.quote!.discount > 0)),
+          )
           .toList();
-      return Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
-          child: RefreshIndicator.noSpinner(
-            onRefresh: onRefresh,
-            child: ListView.builder(
-              key: const PageStorageKey('wishlist'),
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 96),
-              itemCount: items.length + 1,
-              itemBuilder: (context, index) {
-                if (index == 0)
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      PageIntro(
-                        title: 'Sua lista. Seu próximo jogo.',
-                        description: 'Acompanhe seus favoritos e receba avisos quando o preço chegar à sua meta.',
-                        icon: Icons.favorite_outline_rounded,
-                        metrics: [
-                          MetricPill(
-                            icon: Icons.bookmark_border_rounded,
-                            label: '${service.items.length} jogos salvos',
-                          ),
-                          MetricPill(
-                            icon: Icons.notifications_none_rounded,
-                            label: '${service.alerts.length} avisos',
-                          ),
-                        ],
-                        actions: [
-                          FilledButton.icon(
-                            key: const Key('add-wishlist-item'),
-                            onPressed: onAdd,
-                            icon: const Icon(Icons.add),
-                            label: const Text('Adicionar jogo'),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: () => _history(context),
-                            icon: const Icon(Icons.notifications_none),
-                            label: const Text('Ver avisos'),
-                          ),
-                        ],
+      return RefreshIndicator.noSpinner(
+        onRefresh: onRefresh,
+        child: AdaptiveCollection(
+          key: const PageStorageKey('wishlist'),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+          physics: const AlwaysScrollableScrollPhysics(),
+          minColumnWidth: 420,
+          itemCount: items.length,
+          header: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              PageIntro(
+                title: 'Lista de desejos',
+                metrics: [
+                  MetricPill(
+                    icon: Icons.bookmark_border_rounded,
+                    label: '${service.items.length} jogos salvos',
+                  ),
+                  MetricPill(
+                    icon: Icons.notifications_none_rounded,
+                    label: '${service.alerts.length} avisos',
+                  ),
+                ],
+                actions: [
+                  FilledButton.icon(
+                    key: const Key('add-wishlist-item'),
+                    onPressed: onAdd,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Adicionar jogo'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => _history(context),
+                    icon: const Icon(Icons.notifications_none),
+                    label: const Text('Ver avisos'),
+                  ),
+                ],
+              ),
+              if (onSaleCount > 0 || _onlyDiscounted) ...[
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (totalSavings > 0)
+                      Text(
+                        'Economia estimada: R\$ ${totalSavings.toStringAsFixed(2)} · $onSaleCount em promoção',
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
-                      const SizedBox(height: 24),
-                      if (totalSavings > 0)
+                    FilterChip(
+                      label: const Text('Apenas promoções'),
+                      selected: _onlyDiscounted,
+                      onSelected: (value) =>
+                          setState(() => _onlyDiscounted = value),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+              ],
+              CollectionSearchField(
+                controller: _search,
+                hint: 'Buscar na lista de desejos',
+                onChanged: (value) =>
+                    setState(() => _query = value.trim().toLowerCase()),
+              ),
+              const SizedBox(height: 20),
+              if (items.isEmpty)
+                AppEmptyState(
+                  icon: _query.isEmpty
+                      ? Icons.favorite_outline
+                      : Icons.search_off_rounded,
+                  title: _query.isEmpty
+                      ? 'Nenhum jogo salvo'
+                      : 'Nenhum jogo encontrado.',
+                  description: _query.isEmpty
+                      ? 'Busque um jogo ou cole o link da loja para começar a acompanhar seu preço.'
+                      : 'Tente outro nome ou limpe a busca para ver todos os jogos.',
+                ),
+            ],
+          ),
+          itemBuilder: (context, index) {
+            final item = items[index];
+            final scheme = Theme.of(context).colorScheme;
+            final quote = item.quote;
+            final historicalLow = item.lowestPrice;
+            final aboveHistoricalLow =
+                quote != null &&
+                historicalLow != null &&
+                (quote.currentPrice * 100).round() >
+                    (historicalLow * 100).round();
+            return Card(
+              key: ValueKey(item.id),
+              margin: const EdgeInsets.only(bottom: 14),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Container(
-                          margin: const EdgeInsets.only(bottom: 20),
-                          padding: const EdgeInsets.all(16),
+                          width: 60,
+                          height: 76,
+                          clipBehavior: Clip.antiAlias,
                           decoration: BoxDecoration(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .primary
-                                .withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .primary
-                                  .withValues(alpha: 0.25),
-                            ),
+                            color: item.platform.tint.withValues(alpha: .14),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Row(
+                          child: quote?.imageUrl != null
+                              ? Image.network(
+                                  quote!.imageUrl!,
+                                  fit: BoxFit.cover,
+                                  cacheWidth: 180,
+                                  excludeFromSemantics: true,
+                                  errorBuilder: (_, __, ___) => Icon(
+                                    item.platform.icon,
+                                    color: item.platform.tint,
+                                  ),
+                                )
+                              : Icon(
+                                  item.platform.icon,
+                                  color: item.platform.tint,
+                                ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .primary
-                                      .withValues(alpha: 0.2),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Icons.savings_rounded,
-                                  color: Theme.of(context).colorScheme.primary,
-                                  size: 24,
+                              Text(
+                                item.title,
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Text(
-                                          'Economia Total: R\$ ${totalSavings.toStringAsFixed(2)}',
-                                          style: TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w800,
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onSurface,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 6,
-                                            vertical: 2,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .primary,
-                                            borderRadius:
-                                                BorderRadius.circular(6),
-                                          ),
-                                          child: Text(
-                                            '$onSaleCount em promoção',
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w800,
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .onPrimary,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      'De R\$ ${totalOriginal.toStringAsFixed(2)} por R\$ ${totalCurrent.toStringAsFixed(2)} aproveitando as ofertas ativas hoje!',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ],
+                              const SizedBox(height: 5),
+                              Text(
+                                '${item.platform.label}${item.platform == GamePlatform.xbox ? ' · ${quote?.xboxCompatibility.label ?? XboxCompatibility.unknown.label}' : ''}',
+                                style: TextStyle(
+                                  color: scheme.onSurfaceVariant,
+                                  fontSize: 12,
                                 ),
-                              ),
-                              FilterChip(
-                                label: const Text('Apenas promoções'),
-                                selected: _onlyDiscounted,
-                                onSelected: (val) =>
-                                    setState(() => _onlyDiscounted = val),
                               ),
                             ],
                           ),
                         ),
-                      CollectionSearchField(
-                        controller: _search,
-                        hint: 'Buscar na lista de desejos',
-                        onChanged: (value) =>
-                            setState(() => _query = value.trim().toLowerCase()),
-                      ),
-                      const SizedBox(height: 20),
-                      if (items.isEmpty)
-                        AppEmptyState(
-                          icon: _query.isEmpty
-                              ? Icons.favorite_outline
-                              : Icons.search_off_rounded,
-                          title: _query.isEmpty
-                              ? 'Sua próxima aventura começa aqui.'
-                              : 'Nenhum jogo encontrado.',
-                          description: _query.isEmpty
-                              ? 'Busque um jogo ou cole o link da loja para começar a acompanhar seu preço.'
-                              : 'Tente outro nome ou limpe a busca para ver todos os jogos.',
-                        ),
-                    ],
-                  );
-                final item = items[index - 1];
-                final scheme = Theme.of(context).colorScheme;
-                final quote = item.quote;
-                final historicalLow = item.lowestPrice;
-                final aboveHistoricalLow =
-                    quote != null &&
-                    historicalLow != null &&
-                    (quote.currentPrice * 100).round() >
-                        (historicalLow * 100).round();
-                return Card(
-                  key: ValueKey(item.id),
-                  margin: const EdgeInsets.only(bottom: 14),
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: 60,
-                              height: 76,
-                              clipBehavior: Clip.antiAlias,
-                              decoration: BoxDecoration(
-                                color: item.platform.tint.withValues(
-                                  alpha: .14,
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: quote?.imageUrl != null
-                                  ? Image.network(
-                                      quote!.imageUrl!,
-                                      fit: BoxFit.cover,
-                                      cacheWidth: 180,
-                                      excludeFromSemantics: true,
-                                      errorBuilder: (_, __, ___) => Icon(
-                                        item.platform.icon,
-                                        color: item.platform.tint,
-                                      ),
-                                    )
-                                  : Icon(
-                                      item.platform.icon,
-                                      color: item.platform.tint,
-                                    ),
+                        PopupMenuButton<String>(
+                          tooltip: 'Opções do jogo',
+                          onSelected: (value) => value == 'edit'
+                              ? onEdit(item)
+                              : _remove(context, item),
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(
+                              value: 'edit',
+                              child: Text('Editar preço e avisos'),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    item.title,
-                                    style: const TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 5),
-                                  Text(
-                                    '${item.platform.label}${item.platform == GamePlatform.xbox ? ' · ${quote?.xboxCompatibility.label ?? XboxCompatibility.unknown.label}' : ''}',
-                                    style: TextStyle(
-                                      color: scheme.onSurfaceVariant,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            PopupMenuButton<String>(
-                              tooltip: 'Opções do jogo',
-                              onSelected: (value) => value == 'edit'
-                                  ? onEdit(item)
-                                  : _remove(context, item),
-                              itemBuilder: (_) => const [
-                                PopupMenuItem(
-                                  value: 'edit',
-                                  child: Text('Editar preço e avisos'),
-                                ),
-                                PopupMenuItem(
-                                  value: 'remove',
-                                  child: Text('Remover da lista'),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 8,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            Text(
-                              quote?.formattedPrice ??
-                                  'Preço ainda não consultado',
-                              style: TextStyle(
-                                fontSize: quote == null ? 15 : 22,
-                                fontWeight: FontWeight.w800,
-                                color: quote == null
-                                    ? scheme.onSurfaceVariant
-                                    : scheme.onSurface,
-                              ),
-                            ),
-                            if (quote != null && historicalLow != null)
-                              Chip(
-                                label: Text(
-                                  'MPH: ${quote.formattedHistoricalLow(historicalLow)}',
-                                ),
-                              ),
-                            if (aboveHistoricalLow)
-                              Chip(
-                                avatar: Icon(
-                                  Icons.trending_up,
-                                  color: scheme.onErrorContainer,
-                                ),
-                                backgroundColor: scheme.errorContainer,
-                                label: Text(
-                                  'Preço atual acima do MPH',
-                                  style: TextStyle(
-                                    color: scheme.onErrorContainer,
-                                  ),
-                                ),
-                              ),
-                            if (item.targetPrice != null)
-                              Chip(
-                                label: Text(
-                                  'Meta: ${item.targetCurrency} ${item.targetPrice!.toStringAsFixed(2).replaceAll('.', ',')}',
-                                ),
-                              ),
-                            Icon(
-                              item.notify
-                                  ? Icons.notifications_active_outlined
-                                  : Icons.notifications_off_outlined,
-                              size: 18,
-                              color: scheme.onSurfaceVariant,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          quote == null
-                              ? 'O jogo fica salvo mesmo sem cotação disponível na API.'
-                              : quote.isExpired
-                              ? 'Último preço visto · promoção encerrada'
-                              : 'Último preço consultado · confirme as condições na loja',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 12,
-                          children: [
-                            TextButton.icon(
-                              onPressed: () => onEdit(item),
-                              icon: const Icon(Icons.tune, size: 17),
-                              label: const Text('Editar acompanhamento'),
-                            ),
-                            TextButton.icon(
-                              onPressed: item.storeUrl == null
-                                  ? null
-                                  : () => openStoreLink(
-                                      context,
-                                      item.platform,
-                                      item.storeUrl,
-                                    ),
-                              icon: const Icon(Icons.open_in_new, size: 16),
-                              label: const Text('Ver loja'),
+                            PopupMenuItem(
+                              value: 'remove',
+                              child: Text('Remover da lista'),
                             ),
                           ],
                         ),
                       ],
                     ),
-                  ),
-                );
-              },
-            ),
-          ),
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(
+                          quote?.formattedPrice ?? 'Preço ainda não consultado',
+                          style: TextStyle(
+                            fontSize: quote == null ? 15 : 22,
+                            fontWeight: FontWeight.w800,
+                            color: quote == null
+                                ? scheme.onSurfaceVariant
+                                : scheme.onSurface,
+                          ),
+                        ),
+                        if (quote != null && historicalLow != null)
+                          Chip(
+                            label: Text(
+                              'MPH: ${quote.formattedHistoricalLow(historicalLow)}',
+                            ),
+                          ),
+                        if (aboveHistoricalLow)
+                          Chip(
+                            avatar: Icon(
+                              Icons.trending_up,
+                              color: scheme.onErrorContainer,
+                            ),
+                            backgroundColor: scheme.errorContainer,
+                            label: Text(
+                              'Preço atual acima do MPH',
+                              style: TextStyle(color: scheme.onErrorContainer),
+                            ),
+                          ),
+                        if (item.targetPrice != null)
+                          Chip(
+                            label: Text(
+                              'Meta: ${item.targetCurrency} ${item.targetPrice!.toStringAsFixed(2).replaceAll('.', ',')}',
+                            ),
+                          ),
+                        Icon(
+                          item.notify
+                              ? Icons.notifications_active_outlined
+                              : Icons.notifications_off_outlined,
+                          size: 18,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      quote == null
+                          ? 'O jogo fica salvo mesmo sem cotação disponível na API.'
+                          : quote.isExpired
+                          ? 'Último preço visto · promoção encerrada'
+                          : 'Último preço consultado · confirme as condições na loja',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 12,
+                      children: [
+                        TextButton.icon(
+                          onPressed: () => onEdit(item),
+                          icon: const Icon(Icons.tune, size: 17),
+                          label: const Text('Editar acompanhamento'),
+                        ),
+                        TextButton.icon(
+                          onPressed: item.storeUrl == null
+                              ? null
+                              : () => openStoreLink(
+                                  context,
+                                  item.platform,
+                                  item.storeUrl,
+                                ),
+                          icon: const Icon(Icons.open_in_new, size: 16),
+                          label: const Text('Ver loja'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       );
     },

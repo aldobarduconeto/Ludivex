@@ -19,14 +19,14 @@ abstract final class LudivexTheme {
       onPrimary: dark ? const Color(0xFF211743) : Colors.white,
       surface: isOled
           ? const Color(0xFF000000)
-          : (dark ? const Color(0xFF191822) : Colors.white),
-      onSurface: dark ? const Color(0xFFF0F2F5) : const Color(0xFF242135),
+          : (dark ? const Color(0xFF17181C) : Colors.white),
+      onSurface: dark ? const Color(0xFFF1F2F5) : const Color(0xFF191B20),
       onSurfaceVariant: dark
-          ? const Color(0xFFB0AABF)
-          : const Color(0xFF647083),
+          ? const Color(0xFFAFB3BE)
+          : const Color(0xFF565B67),
       outlineVariant: isOled
           ? const Color(0xFF22262E)
-          : (dark ? const Color(0xFF383344) : const Color(0xFFDCD6E7)),
+          : (dark ? const Color(0xFF343740) : const Color(0xFFDCE0E7)),
       primaryContainer: dark
           ? (isOled ? const Color(0xFF251B3A) : const Color(0xFF30264E))
           : const Color(0xFFEDE4FF),
@@ -41,16 +41,16 @@ abstract final class LudivexTheme {
           : const Color(0xFF10334C),
       surfaceContainerHighest: isOled
           ? const Color(0xFF111418)
-          : (dark ? const Color(0xFF2B2736) : const Color(0xFFEFEBF5)),
+          : (dark ? const Color(0xFF292C34) : const Color(0xFFEAEDF2)),
       surfaceContainerLow: isOled
           ? const Color(0xFF08090C)
-          : (dark ? const Color(0xFF1D1B28) : const Color(0xFFF3EFF8)),
+          : (dark ? const Color(0xFF1C1F25) : const Color(0xFFF5F6F8)),
       surfaceContainer: isOled
           ? const Color(0xFF0C0B10)
-          : (dark ? const Color(0xFF211E2C) : const Color(0xFFF0ECF7)),
+          : (dark ? const Color(0xFF20232A) : const Color(0xFFF0F2F5)),
       surfaceContainerHigh: isOled
           ? const Color(0xFF100F15)
-          : (dark ? const Color(0xFF262332) : const Color(0xFFEBE6F3)),
+          : (dark ? const Color(0xFF252830) : const Color(0xFFEDEFF3)),
     );
     if (accentColor != null) {
       final palette = ColorScheme.fromSeed(
@@ -62,6 +62,10 @@ abstract final class LudivexTheme {
         onPrimary: palette.onPrimary,
         primaryContainer: palette.primaryContainer,
         onPrimaryContainer: palette.onPrimaryContainer,
+        secondary: palette.secondary,
+        onSecondary: palette.onSecondary,
+        secondaryContainer: palette.secondaryContainer,
+        onSecondaryContainer: palette.onSecondaryContainer,
       );
     }
     final base = ThemeData(
@@ -74,14 +78,14 @@ abstract final class LudivexTheme {
       hoverColor: colors.primary.withValues(alpha: .06),
       scaffoldBackgroundColor: isOled
           ? const Color(0xFF000000)
-          : (dark ? const Color(0xFF111019) : const Color(0xFFF7F5FB)),
+          : (dark ? const Color(0xFF101115) : const Color(0xFFF7F8FA)),
       textTheme: base.textTheme
           .apply(bodyColor: colors.onSurface, displayColor: colors.onSurface)
           .copyWith(
             headlineLarge: TextStyle(
               fontFamily: 'Roboto',
               fontSize: 36,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               letterSpacing: -1,
               color: colors.onSurface,
             ),
@@ -136,7 +140,7 @@ abstract final class LudivexTheme {
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           side: BorderSide(
             color: isOled
                 ? const Color(0xFF1E222A)
@@ -153,7 +157,7 @@ abstract final class LudivexTheme {
             : colors.surfaceContainerLow,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
-          vertical: 16,
+          vertical: 12,
         ),
         hintStyle: TextStyle(
           fontFamily: 'Roboto',
@@ -192,10 +196,10 @@ abstract final class LudivexTheme {
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        height: 72,
+        height: 64,
         backgroundColor: isOled ? const Color(0xFF000000) : colors.surface,
         elevation: 0,
-        indicatorColor: colors.primary.withValues(alpha: .13),
+        indicatorColor: colors.primaryContainer,
         labelTextStyle: WidgetStateProperty.resolveWith(
           (states) => TextStyle(
             fontFamily: 'Roboto',
@@ -213,7 +217,7 @@ abstract final class LudivexTheme {
         style: FilledButton.styleFrom(
           minimumSize: const Size(48, 48),
           elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(11),
           ),
@@ -227,7 +231,7 @@ abstract final class LudivexTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           minimumSize: const Size(48, 48),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           side: BorderSide(
             color: isOled ? const Color(0xFF22262E) : colors.outlineVariant,
           ),
@@ -265,7 +269,7 @@ abstract final class LudivexTheme {
       ),
       popupMenuTheme: PopupMenuThemeData(
         color: isOled ? const Color(0xFF0E1115) : colors.surfaceContainerLow,
-        elevation: 6,
+        elevation: 2,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
       tooltipTheme: TooltipThemeData(
@@ -279,7 +283,7 @@ abstract final class LudivexTheme {
       ),
       listTileTheme: ListTileThemeData(
         iconColor: colors.onSurfaceVariant,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
       ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: isOled ? const Color(0xFF07090C) : colors.surface,

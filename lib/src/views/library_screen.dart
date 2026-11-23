@@ -531,7 +531,6 @@ class _LibraryScreenState extends State<LibraryScreen>
                     title: 'Biblioteca de jogos',
                     description:
                         '${all.length} jogos · ${sources.length} plataformas',
-                    icon: Icons.sports_esports_outlined,
                     actions: [
                       if (supportsStoreAccounts)
                         OutlinedButton.icon(
@@ -771,21 +770,23 @@ class _LibraryScreenState extends State<LibraryScreen>
                     )
                   : SliverLayoutBuilder(
                       builder: (context, constraints) {
-                        final columns = (constraints.crossAxisExtent / 300)
-                            .floor()
-                            .clamp(1, 4);
+                        final scale = MediaQuery.textScalerOf(context).scale(1);
+                        final columns =
+                            ((constraints.crossAxisExtent + 12) /
+                                    (280 * scale.clamp(1.0, 1.5) + 12))
+                                .floor();
                         return SliverGrid.builder(
                           gridDelegate:
                               SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: columns,
+                                crossAxisCount: columns < 1 ? 1 : columns,
                                 mainAxisExtent:
-                                    290 +
+                                    242 +
                                     (MediaQuery.textScalerOf(context).scale(1) -
                                                 1)
                                             .clamp(0, 3) *
                                         130,
-                                mainAxisSpacing: 16,
-                                crossAxisSpacing: 16,
+                                mainAxisSpacing: 12,
+                                crossAxisSpacing: 12,
                               ),
                           itemCount: games.length,
                           itemBuilder: gameTile,

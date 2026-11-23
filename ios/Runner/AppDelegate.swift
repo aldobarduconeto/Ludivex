@@ -1,7 +1,5 @@
 import Flutter
 import UIKit
-import CoreBluetooth
-import AVFAudio
 import UserNotifications
 import SwiftUI
 
@@ -28,6 +26,7 @@ import SwiftUI
       deviceChannel = channel
       channel.setMethodCallHandler { call, result in
         if call.method == "scan" { lister.scan(result) }
+        else if call.method == "readDetails" { lister.readDetails(call.arguments, result: result) }
         else { result(FlutterMethodNotImplemented) }
       }
     }
@@ -105,75 +104,5 @@ private struct DiscoveryHeroContent: View {
       .padding(.horizontal, 10)
       .padding(.vertical, 7)
       .background(.white.opacity(0.14), in: Capsule())
-  }
-}
-
-private final class LudivexBluetoothLister: NSObject, CBCentralManagerDelegate {
-  private var manager: CBCentralManager?
-  private var pending: FlutterResult?
-  private var found: [String: [String: Any]] = [:]
-  private var stop: DispatchWorkItem?
-  private var scanning = false
-
-  func scan(_ result: @escaping FlutterResult) {
-    guard pending == nil else { result(FlutterError(code: "BUSY", message: "Uma busca Bluetooth já está em andamento.", details: nil)); return }
-    pending = result
-    found.removeAll()
-    for output in AVAudioSession.sharedInstance().currentRoute.outputs {
-      if [.bluetoothA2DP, .bluetoothHFP, .bluetoothLE].contains(output.portType) {
-        found["audio:" + output.uid] = ["id": "ios:audio:" + output.uid, "name": output.portName, "kind": "headset"]
-      }
-    }
-    if let manager = manager { handleState(manager) }
-    else { manager = CBCentralManager(delegate: self, queue: .main) }
-  }
-
-  func centralManagerDidUpdateState(_ central: CBCentralManager) { handleState(central) }
-
-  private func handleState(_ central: CBCentralManager) {
-    guard pending != nil else { return }
-    switch central.state {
-    case .poweredOn:
-      guard !scanning else { return }
-      scanning = true
-      for peripheral in central.retrieveConnectedPeripherals(withServices: [CBUUID(string: "1812"), CBUUID(string: "180F"), CBUUID(string: "180A"), CBUUID(string: "184E"), CBUUID(string: "1850")]) {
-        add(peripheral, name: peripheral.name)
-      }
-      central.scanForPeripherals(withServices: nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
-      let task = DispatchWorkItem { [weak self] in self?.finish() }
-      stop = task
-      DispatchQueue.main.asyncAfter(deadline: .now() + 6, execute: task)
-    case .unauthorized:
-      finish(error: "Autorize o Bluetooth nas configurações do iPhone.")
-    case .poweredOff:
-      finish(error: "Ligue o Bluetooth nas configurações do iPhone.")
-    case .unsupported:
-      finish(error: "Bluetooth não disponível neste dispositivo.")
-    default: break // Wait for the system permission/state callback.
-    }
-  }
-
-  func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber) {
-    guard pending != nil else { return }
-    add(peripheral, name: advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? peripheral.name)
-  }
-
-  private func add(_ peripheral: CBPeripheral, name: String?) {
-    let label = name ?? "Dispositivo Bluetooth"
-    let value = label.lowercased()
-    let kind = value.range(of: "controller|gamepad|dualsense|dualshock|xbox|8bitdo|gamesir|joy-con", options: .regularExpression) != nil ? "controller"
-      : value.range(of: "headset|headphone|earbud|arctis|wh-?[0-9]|wf-?[0-9]|airpods|buds|fone|jabra|bose|beats", options: .regularExpression) != nil ? "headset" : "other"
-    found[peripheral.identifier.uuidString] = ["id": "ios:ble:" + peripheral.identifier.uuidString, "name": label, "kind": kind]
-  }
-
-  private func finish(error: String? = nil) {
-    stop?.cancel()
-    stop = nil
-    if scanning { manager?.stopScan() }
-    scanning = false
-    let result = pending
-    pending = nil
-    if let error = error, found.isEmpty { result?(FlutterError(code: "BLUETOOTH", message: error, details: nil)) }
-    else { result?(found.values.sorted { ($0["name"] as? String ?? "") < ($1["name"] as? String ?? "") }) }
   }
 }

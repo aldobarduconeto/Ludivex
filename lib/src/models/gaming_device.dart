@@ -1,5 +1,15 @@
 enum GamingDeviceKind { controller, headset, other }
 
+enum DeviceBatteryLevel {
+  empty('Esgotada'),
+  low('Baixa'),
+  medium('Média'),
+  full('Cheia');
+
+  const DeviceBatteryLevel(this.label);
+  final String label;
+}
+
 extension GamingDeviceKindLabel on GamingDeviceKind {
   String get label => switch (this) {
     GamingDeviceKind.controller => 'Controle',
@@ -18,6 +28,7 @@ class GamingDevice {
     this.model,
     this.firmware,
     this.battery,
+    this.batteryLevel,
     this.gattReadable = false,
     this.manual = false,
   });
@@ -27,6 +38,7 @@ class GamingDevice {
   final DateTime seenAt;
   final String? firmware;
   final int? battery;
+  final DeviceBatteryLevel? batteryLevel;
   final bool gattReadable, manual;
 
   String get displayModel {
@@ -83,7 +95,7 @@ class GamingDevice {
     if (lower.contains('razer')) return 'Razer';
     if (lower.contains('logitech')) return 'Logitech G';
     if (lower.contains('jbl')) return 'JBL';
-    return 'Bluetooth PnP';
+    return id.startsWith('xinput:') ? 'XInput' : 'Bluetooth PnP';
   }
 
   factory GamingDevice.fromJson(Map<String, dynamic> json) {
@@ -102,13 +114,18 @@ class GamingDevice {
         orElse: () => GamingDeviceKind.other,
       ),
       manufacturer: json['manufacturer'] as String? ?? '',
-      model: rawModel != null && rawModel.trim().isNotEmpty ? rawModel.trim() : null,
+      model: rawModel != null && rawModel.trim().isNotEmpty
+          ? rawModel.trim()
+          : null,
       firmware: (json['firmware'] as String?)?.trim().isEmpty == false
           ? json['firmware'] as String
           : null,
       battery: battery is num && battery >= 0 && battery <= 100
           ? battery.toInt()
           : null,
+      batteryLevel: DeviceBatteryLevel.values
+          .where((level) => level.name == json['batteryLevel'])
+          .firstOrNull,
       seenAt:
           DateTime.tryParse(json['seenAt'] as String? ?? '') ??
           DateTime.now().toUtc(),
@@ -125,6 +142,7 @@ class GamingDevice {
     'model': model,
     'firmware': firmware,
     'battery': battery,
+    'batteryLevel': batteryLevel?.name,
     'seenAt': seenAt.toIso8601String(),
     'gattReadable': gattReadable,
     'manual': manual,

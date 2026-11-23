@@ -37,54 +37,34 @@ class CollectionSearchField extends StatelessWidget {
   );
 }
 
-/// Responsive page introductions shared by the library, wishlist and settings.
+/// A page heading with actions that wrap on narrow layouts.
 class PageIntro extends StatelessWidget {
   const PageIntro({
     super.key,
     required this.title,
-    required this.description,
-    required this.icon,
+    this.description = '',
     this.actions = const [],
     this.metrics = const [],
   });
+
   final String title, description;
-  final IconData icon;
   final List<Widget> actions, metrics;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context), c = theme.colorScheme;
-    final heading = Row(
+    final theme = Theme.of(context);
+    final heading = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: c.primaryContainer,
-            borderRadius: BorderRadius.circular(12),
+        if (title.isNotEmpty)
+          Text(title, style: theme.textTheme.headlineMedium),
+        if (description.isNotEmpty)
+          Text(description, style: theme.textTheme.bodySmall),
+        if (metrics.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Wrap(spacing: 12, runSpacing: 4, children: metrics),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Icon(icon, size: 22, color: c.onPrimaryContainer),
-          ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: theme.textTheme.headlineMedium),
-              if (description.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  description,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: c.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
       ],
     );
     final controls = Wrap(
@@ -93,48 +73,97 @@ class PageIntro extends StatelessWidget {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: actions,
     );
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final inlineActions =
-            actions.isNotEmpty &&
-            constraints.maxWidth >= 840 &&
-            MediaQuery.textScalerOf(context).scale(16) <= 20;
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          padding: EdgeInsets.all(constraints.maxWidth < 480 ? 14 : 20),
-          decoration: BoxDecoration(
-            color: c.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: c.outlineVariant.withValues(alpha: .65)),
-          ),
-          child: Column(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (actions.isEmpty) return heading;
+          final inlineActions =
+              constraints.maxWidth >= 760 &&
+              MediaQuery.textScalerOf(context).scale(16) <= 20;
+          if (inlineActions) {
+            return Row(
+              children: [
+                Expanded(child: heading),
+                const SizedBox(width: 16),
+                Flexible(
+                  flex: 2,
+                  child: Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: controls,
+                  ),
+                ),
+              ],
+            );
+          }
+          return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (inlineActions)
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(flex: 3, child: heading),
-                    const SizedBox(width: 16),
-                    Flexible(flex: 2, child: controls),
-                  ],
-                )
-              else
-                heading,
-              if (metrics.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Wrap(spacing: 8, runSpacing: 8, children: metrics),
-              ],
-              if (!inlineActions && actions.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                controls,
-              ],
-            ],
-          ),
-        );
-      },
+            children: [heading, const SizedBox(height: 8), controls],
+          );
+        },
+      ),
     );
   }
+}
+
+/// A scrolling collection with naturally sized cards and more columns when space allows.
+class AdaptiveCollection extends StatelessWidget {
+  const AdaptiveCollection({
+    super.key,
+    required this.itemCount,
+    required this.itemBuilder,
+    this.header,
+    this.padding,
+    this.physics,
+    this.minColumnWidth = 390,
+  });
+
+  final int itemCount;
+  final IndexedWidgetBuilder itemBuilder;
+  final Widget? header;
+  final EdgeInsets? padding;
+  final ScrollPhysics? physics;
+  final double minColumnWidth;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      const gap = 12.0;
+      final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
+      final usableWidth = constraints.maxWidth - (padding?.horizontal ?? 0);
+      final fitted = ((usableWidth + gap) / (minColumnWidth * scale + gap))
+          .floor();
+      final columns = fitted < 1 ? 1 : fitted;
+      final headerRows = header == null ? 0 : 1;
+      return ListView.builder(
+        padding: padding,
+        physics: physics,
+        itemCount: (itemCount + columns - 1) ~/ columns + headerRows,
+        itemBuilder: (context, row) {
+          if (row < headerRows) return header!;
+          final first = (row - headerRows) * columns;
+          if (columns == 1) return itemBuilder(context, first);
+          final width = (usableWidth - (columns - 1) * gap) / columns;
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (
+                var offset = 0;
+                offset < columns && first + offset < itemCount;
+                offset++
+              ) ...[
+                if (offset > 0) const SizedBox(width: gap),
+                SizedBox(
+                  width: width,
+                  child: itemBuilder(context, first + offset),
+                ),
+              ],
+            ],
+          );
+        },
+      );
+    },
+  );
 }
 
 class MetricPill extends StatelessWidget {
@@ -145,11 +174,7 @@ class MetricPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: c.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(8),
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -181,35 +206,25 @@ class AppEmptyState extends StatelessWidget {
     return Center(
       child: Container(
         constraints: const BoxConstraints(maxWidth: 620),
-        padding: const EdgeInsets.all(28),
-        decoration: BoxDecoration(
-          color: c.surface,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: c.outlineVariant.withValues(alpha: .6)),
-        ),
+        padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: c.primary.withValues(alpha: .09),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, size: 36, color: c.primary),
-            ),
-            const SizedBox(height: 20),
+            Icon(icon, size: 30, color: c.primary),
+            const SizedBox(height: 12),
             Text(
               title,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            const SizedBox(height: 10),
-            Text(
-              description,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: c.onSurfaceVariant, height: 1.5),
-            ),
+            if (description.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                description,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: c.onSurfaceVariant, height: 1.4),
+              ),
+            ],
             if (action != null) ...[const SizedBox(height: 20), action!],
           ],
         ),

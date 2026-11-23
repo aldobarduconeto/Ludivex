@@ -28,6 +28,7 @@ import 'views/widgets/app_preferences.dart';
 import 'views/widgets/deal_card.dart';
 import 'views/widgets/app_sidebar.dart';
 import 'views/widgets/discovery_hero.dart';
+import 'views/widgets/page_components.dart';
 import 'views/widgets/app_theme.dart';
 import 'views/widgets/welcome_dialog.dart';
 import 'views/widgets/desktop_top_bar.dart';
@@ -61,6 +62,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
   String? _error;
   String _query = '';
   late int _tab;
+  int _appearanceRequest = 0;
   int _requestId = 0;
   GamePlatform? _filter;
   XboxCompatibility? _xboxCompatibility;
@@ -68,29 +70,21 @@ class _AppState extends State<App> with WidgetsBindingObserver {
   String? _activeSearchTag;
 
   static const _quickSearchTags = [
-    (
-      id: 'free',
-      label: '🎁 100% Grátis',
-      hint: 'Jogos 100% gratuitos e resgates',
-    ),
+    (id: 'free', label: 'Grátis', hint: 'Jogos 100% gratuitos e resgates'),
     (
       id: 'discount_80',
-      label: '🔥 80%+ OFF',
+      label: '80% ou mais de desconto',
       hint: 'Descontos massivos a partir de 80%',
     ),
     (
       id: 'under_10',
-      label: r'⚡ Menos de R$ 10',
+      label: r'Menos de R$ 10',
       hint: 'Super ofertas até 10 reais',
     ),
-    (id: 'under_25', label: r'🏷️ Menos de R$ 25', hint: 'Jogos até 25 reais'),
-    (id: 'under_50', label: r'💎 Menos de R$ 50', hint: 'Jogos até 50 reais'),
-    (
-      id: 'pc',
-      label: '💻 Lojas de PC',
-      hint: 'Steam, Epic, Nuuvem, EA, Ubisoft',
-    ),
-    (id: 'consoles', label: '🎯 Consoles', hint: 'PlayStation e Xbox'),
+    (id: 'under_25', label: r'Menos de R$ 25', hint: 'Jogos até 25 reais'),
+    (id: 'under_50', label: r'Menos de R$ 50', hint: 'Jogos até 50 reais'),
+    (id: 'pc', label: 'Lojas de PC', hint: 'Steam, Epic, Nuuvem, EA, Ubisoft'),
+    (id: 'consoles', label: 'Consoles', hint: 'PlayStation e Xbox'),
   ];
   Timer? _debounce, _timer;
   String? _catalogSignature;
@@ -98,8 +92,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
   final _shellKey = GlobalKey<ScaffoldState>();
   final _navigator = GlobalKey<NavigatorState>();
   final _offersAnchor = GlobalKey();
-  final _campaignPager = PageController();
-  final _campaignPage = ValueNotifier<int>(0);
+  final _campaignScroll = ScrollController();
   late ThemeData _lightTheme, _darkTheme, _oledTheme;
   Color? _themeAccent;
 
@@ -210,8 +203,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
     _timer?.cancel();
     _debounce?.cancel();
     _search.dispose();
-    _campaignPager.dispose();
-    _campaignPage.dispose();
+    _campaignScroll.dispose();
     super.dispose();
   }
 
@@ -264,7 +256,9 @@ class _AppState extends State<App> with WidgetsBindingObserver {
 
   Future<void> _refresh({bool force = false}) async {
     if (_loading && !force) return;
-    if (!force && _catalogSignature == _prefs.sourceSignature && _deals.isNotEmpty) {
+    if (!force &&
+        _catalogSignature == _prefs.sourceSignature &&
+        _deals.isNotEmpty) {
       return;
     }
     final generation = ++_requestId;
@@ -438,8 +432,6 @@ class _AppState extends State<App> with WidgetsBindingObserver {
   Widget _sidebar(BuildContext context, {bool route = false, int? selected}) =>
       AppSidebar(
         selectedIndex: selected ?? _tab,
-        wishlistCount: _wishlist.items.length,
-        offerCount: _deals.where((d) => !d.isExpired).length,
         stores: _prefs.orderedPlatforms,
         activeStore: _filter,
         onNavigate: (index) {
@@ -491,44 +483,6 @@ class _AppState extends State<App> with WidgetsBindingObserver {
     _ => 'Configurações',
   };
 
-  Widget _desktopHeader(BuildContext context) {
-    final theme = Theme.of(context);
-    return Material(
-      color: theme.colorScheme.surfaceContainerLow,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _sectionTitle,
-                    style: theme.textTheme.titleMedium,
-                  ),
-                ),
-                if (_tab == 0) ...[
-                  IconButton(
-                    tooltip: 'Atualizar ofertas',
-                    onPressed: _loading ? null : () => _refresh(force: true),
-                    icon: const Icon(Icons.sync_rounded),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton.tonalIcon(
-                    onPressed: () => _add(context),
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Adicionar à lista'),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'ludivex',
@@ -565,26 +519,6 @@ class _AppState extends State<App> with WidgetsBindingObserver {
                     ),
                     centerTitle: true,
                     title: Text(_sectionTitle, overflow: TextOverflow.ellipsis),
-                    actions: [
-                      if (_tab == 0)
-                        IconButton(
-                          tooltip: 'Atualizar ofertas',
-                          onPressed: _loading
-                              ? null
-                              : () => _refresh(force: true),
-                          icon: const Icon(Icons.sync_rounded, size: 21),
-                        ),
-                      if (_tab == 0)
-                        IconButton(
-                          tooltip: 'Adicionar à lista',
-                          onPressed: () => _add(context),
-                          icon: const Icon(
-                            Icons.add_circle_outline_rounded,
-                            size: 23,
-                          ),
-                        ),
-                      const SizedBox(width: 8),
-                    ],
                   ),
             body: SafeArea(
               top: wide,
@@ -594,46 +528,47 @@ class _AppState extends State<App> with WidgetsBindingObserver {
                   Expanded(
                     child: Column(
                       children: [
-                        if (wide) _desktopHeader(context),
                         Expanded(
-                          child: Center(
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 1600),
-                              child: _LazySections(
-                                index: _tab,
-                                pages: [
-                                  () => _catalog(context),
-                                  () => WishlistScreen(
-                                    service: _wishlist,
-                                    onAdd: () => _add(context),
-                                    onEdit: (item) => _add(context, item: item),
-                                    onRefresh: () => _refresh(force: true),
-                                  ),
-                                  () => SettingsScreen(
-                                    api: _api,
-                                    wishlist: _wishlist,
-                                    embedded: true,
-                                    onSaved: () {
-                                      _schedule();
-                                      unawaited(_refresh());
-                                    },
-                                  ),
-                                  () => LibraryScreen(
-                                    service: LibraryService.instance,
-                                    active: _tab == 3,
-                                  ),
-                                  () => DevicesScreen(
-                                    service: DeviceService.instance,
-                                    active: _tab == devicesTabIndex,
-                                  ),
-                                  () => NewsScreen(
-                                    library: LibraryService.instance,
-                                    transport: _api.transport,
-                                    active: _tab == newsTabIndex,
-                                  ),
-                                ],
+                          child: _LazySections(
+                            index: _tab,
+                            pages: [
+                              () => _catalog(context),
+                              () => WishlistScreen(
+                                service: _wishlist,
+                                onAdd: () => _add(context),
+                                onEdit: (item) => _add(context, item: item),
+                                onRefresh: () => _refresh(force: true),
                               ),
-                            ),
+                              () => SettingsScreen(
+                                api: _api,
+                                wishlist: _wishlist,
+                                embedded: true,
+                                showTitle: wide,
+                                appearanceRequest: _appearanceRequest,
+                                onSaved: () {
+                                  _schedule();
+                                  unawaited(_refresh());
+                                },
+                              ),
+                              () => LibraryScreen(
+                                service: LibraryService.instance,
+                                active: _tab == 3,
+                              ),
+                              () => DevicesScreen(
+                                service: DeviceService.instance,
+                                active: _tab == devicesTabIndex,
+                                showTitle: wide,
+                                onAppearance: () => setState(() {
+                                  _appearanceRequest++;
+                                  _tab = 2;
+                                }),
+                              ),
+                              () => NewsScreen(
+                                library: LibraryService.instance,
+                                transport: _api.transport,
+                                active: _tab == newsTabIndex,
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -655,6 +590,9 @@ class _AppState extends State<App> with WidgetsBindingObserver {
                     ),
                     child: NavigationBar(
                       selectedIndex: _tab,
+                      labelBehavior: constraints.maxWidth < 420
+                          ? NavigationDestinationLabelBehavior.onlyShowSelected
+                          : NavigationDestinationLabelBehavior.alwaysShow,
                       onDestinationSelected: (tab) {
                         if (_tab != tab) {
                           setState(() => _tab = tab);
@@ -684,7 +622,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
                         NavigationDestination(
                           icon: Icon(Icons.devices_other_outlined),
                           selectedIcon: Icon(Icons.devices_other_rounded),
-                          label: 'Setup',
+                          label: 'Dispositivos',
                         ),
                         NavigationDestination(
                           icon: Icon(Icons.newspaper_outlined),
@@ -900,145 +838,86 @@ class _AppState extends State<App> with WidgetsBindingObserver {
     List<SaleCampaign> campaigns,
     double scale,
   ) {
-    final hero = DiscoveryHero(
-      offerCount: available.length,
-      storeCount: _prefs.platforms.length,
-      featured: available.firstOrNull,
-      onExplore: () {
-        final anchor = _offersAnchor.currentContext;
-        if (anchor != null)
-          Scrollable.ensureVisible(
-            anchor,
-            duration: MediaQuery.disableAnimationsOf(context)
-                ? Duration.zero
-                : const Duration(milliseconds: 240),
-            curve: Curves.easeOut,
-          );
-      },
-    );
+    final theme = Theme.of(context);
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth < 600 && campaigns.isNotEmpty) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              hero,
-              const SizedBox(height: 20),
-              Text('Campanhas', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 164 * scale,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: campaigns.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (_, index) => SizedBox(
-                    width: constraints.maxWidth - 16,
-                    child: SaleBanner(
-                      campaign: campaigns[index],
-                      onTap: () => _openCampaign(context, campaigns[index]),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          );
-        }
-        if (constraints.maxWidth >= 950 &&
-            scale < 1.3 &&
-            campaigns.isNotEmpty) {
-          return SizedBox(
-            height: 292,
-            child: Row(
-              children: [
-                Expanded(child: hero),
-                const SizedBox(width: 20),
-                SizedBox(
-                  width: 322,
-                  child: Column(
-                    children: [
-                      ValueListenableBuilder<int>(
-                        valueListenable: _campaignPage,
-                        builder: (context, page, _) => Row(
-                          children: [
-                            const Expanded(
-                              child: Text(
-                                'EM DESTAQUE',
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  letterSpacing: 1.6,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              tooltip: 'Campanha anterior',
-                              visualDensity: VisualDensity.compact,
-                              onPressed: page > 0
-                                  ? () => _campaignPager.previousPage(
-                                      duration: const Duration(
-                                        milliseconds: 180,
-                                      ),
-                                      curve: Curves.easeOut,
-                                    )
-                                  : null,
-                              icon: const Icon(Icons.chevron_left, size: 20),
-                            ),
-                            IconButton(
-                              tooltip: 'Próxima campanha',
-                              visualDensity: VisualDensity.compact,
-                              onPressed: page < campaigns.length - 1
-                                  ? () => _campaignPager.nextPage(
-                                      duration: const Duration(
-                                        milliseconds: 180,
-                                      ),
-                                      curve: Curves.easeOut,
-                                    )
-                                  : null,
-                              icon: const Icon(Icons.chevron_right, size: 20),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Expanded(
-                        child: PageView.builder(
-                          controller: _campaignPager,
-                          onPageChanged: (page) => _campaignPage.value = page,
-                          itemCount: campaigns.length,
-                          itemBuilder: (_, index) => SaleBanner(
-                            campaign: campaigns[index],
-                            onTap: () =>
-                                _openCampaign(context, campaigns[index]),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
+        final cardWidth = (constraints.maxWidth - 12).clamp(0.0, 320.0);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            hero,
+            DiscoveryHero(
+              offerCount: available.length,
+              featured: available.firstOrNull,
+              onExplore: () {
+                final anchor = _offersAnchor.currentContext;
+                if (anchor != null) {
+                  Scrollable.ensureVisible(
+                    anchor,
+                    duration: MediaQuery.disableAnimationsOf(context)
+                        ? Duration.zero
+                        : const Duration(milliseconds: 240),
+                    curve: Curves.easeOut,
+                  );
+                }
+              },
+              onRefresh: _loading ? null : () => _refresh(force: true),
+              onAdd: () => _add(context),
+            ),
             if (campaigns.isNotEmpty) ...[
-              const SizedBox(height: 24),
-              const Text(
-                'Em destaque',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Campanhas',
+                      style: theme.textTheme.titleMedium,
+                    ),
+                  ),
+                  if (campaigns.length * (cardWidth + 12) - 12 >
+                      constraints.maxWidth) ...[
+                    for (final direction in [-1, 1])
+                      IconButton(
+                        tooltip: direction < 0
+                            ? 'Campanha anterior'
+                            : 'Próxima campanha',
+                        onPressed: () {
+                          if (!_campaignScroll.hasClients) return;
+                          final target =
+                              (_campaignScroll.offset +
+                                      direction * (cardWidth + 12))
+                                  .clamp(
+                                    0.0,
+                                    _campaignScroll.position.maxScrollExtent,
+                                  );
+                          if (MediaQuery.disableAnimationsOf(context)) {
+                            _campaignScroll.jumpTo(target);
+                          } else {
+                            _campaignScroll.animateTo(
+                              target,
+                              duration: const Duration(milliseconds: 180),
+                              curve: Curves.easeOut,
+                            );
+                          }
+                        },
+                        icon: Icon(
+                          direction < 0
+                              ? Icons.chevron_left
+                              : Icons.chevron_right,
+                        ),
+                      ),
+                  ],
+                ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               SizedBox(
-                height: 172 * scale,
+                height: 96 + (scale - 1) * 86,
                 child: ListView.separated(
+                  controller: _campaignScroll,
                   scrollDirection: Axis.horizontal,
                   itemCount: campaigns.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                  separatorBuilder: (_, _) => const SizedBox(width: 12),
                   itemBuilder: (_, index) => SizedBox(
-                    width: constraints.maxWidth < 500 ? 276 : 330,
+                    width: cardWidth,
                     child: SaleBanner(
                       campaign: campaigns[index],
                       onTap: () => _openCampaign(context, campaigns[index]),
@@ -1059,7 +938,8 @@ class _AppState extends State<App> with WidgetsBindingObserver {
         ? available
         : available.take(_visibleLimit).toList();
     final campaigns = _api.campaigns;
-    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
+    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 4.0);
+    final gutter = MediaQuery.sizeOf(context).width < 600 ? 16.0 : 24.0;
     return RefreshIndicator.noSpinner(
       onRefresh: () => _refresh(force: true),
       child: CustomScrollView(
@@ -1067,144 +947,102 @@ class _AppState extends State<App> with WidgetsBindingObserver {
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+            padding: EdgeInsets.fromLTRB(gutter, 12, gutter, 0),
             sliver: SliverToBoxAdapter(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _highlights(context, available, campaigns, scale),
-                  const SizedBox(height: 24),
-                  TextField(
+                  const SizedBox(height: 12),
+                  CollectionSearchField(
                     controller: _search,
-                    decoration: const InputDecoration(
-                      hintText: 'Buscar nas ofertas carregadas',
-                      prefixIcon: Icon(Icons.search),
-                    ),
+                    hint: 'Buscar ofertas',
                     onChanged: (value) {
                       _debounce?.cancel();
                       _debounce = Timer(const Duration(milliseconds: 250), () {
-                        if (mounted)
+                        if (mounted) {
                           setState(() => _query = value.trim().toLowerCase());
+                        }
                       });
                     },
                   ),
-                  const SizedBox(height: 12),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        for (final tag in _quickSearchTags)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: FilterChip(
-                              selected: _activeSearchTag == tag.id,
-                              label: Text(
-                                tag.label,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: _activeSearchTag == tag.id
-                                      ? FontWeight.w700
-                                      : FontWeight.w500,
-                                ),
-                              ),
-                              tooltip: tag.hint,
-                              showCheckmark: false,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              selectedColor: tag.id == 'free'
-                                  ? const Color(0xFF20B969)
-                                        .withValues(alpha: 0.22)
-                                  : tag.id == 'discount_80'
-                                  ? Colors.redAccent.withValues(alpha: 0.22)
-                                  : Theme.of(context).colorScheme.primary
-                                        .withValues(alpha: 0.18),
-                              side: BorderSide(
-                                color: _activeSearchTag == tag.id
-                                    ? (tag.id == 'free'
-                                          ? const Color(0xFF20B969)
-                                          : tag.id == 'discount_80'
-                                          ? Colors.redAccent
-                                          : Theme.of(context)
-                                                .colorScheme
-                                                .primary)
-                                    : Theme.of(context)
-                                          .colorScheme
-                                          .outlineVariant
-                                          .withValues(alpha: 0.4),
-                                width: _activeSearchTag == tag.id ? 1.4 : 0.8,
-                              ),
-                              onSelected: (selected) {
-                                setState(() {
-                                  _activeSearchTag = selected ? tag.id : null;
-                                });
-                              },
-                            ),
-                          ),
-                        if (_activeSearchTag != null)
-                          TextButton.icon(
-                            style: TextButton.styleFrom(
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                              ),
-                            ),
-                            onPressed: () =>
-                                setState(() => _activeSearchTag = null),
-                            icon: const Icon(Icons.close_rounded, size: 14),
-                            label: const Text(
-                              'Limpar tag',
-                              style: TextStyle(fontSize: 11),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      ChoiceChip(
-                        avatar: const Icon(Icons.apps_rounded, size: 16),
-                        label: const Text('Todas as lojas'),
-                        selected: _filter == null && !_onlyFreeHub,
-                        onSelected: (_) => setState(() {
-                          _filter = null;
+                      PopupMenuButton<int>(
+                        tooltip: 'Filtrar por loja',
+                        onSelected: (index) => setState(() {
+                          _filter = index < 0
+                              ? null
+                              : GamePlatform.values[index];
                           _onlyFreeHub = false;
                         }),
-                      ),
-                      ChoiceChip(
-                        avatar: const Icon(
-                          Icons.card_giftcard_rounded,
-                          size: 16,
-                          color: Color(0xFF20B969),
-                        ),
-                        label: const Text('🎁 100% Grátis da Semana'),
-                        selected: _onlyFreeHub,
-                        onSelected: (val) => setState(() {
-                          _onlyFreeHub = val;
-                          if (val) _filter = null;
-                        }),
-                      ),
-                      ..._prefs.orderedPlatforms.map(
-                        (platform) => ChoiceChip(
-                          label: Text(platform.shortLabel),
-                          avatar: Icon(
-                            platform.icon,
-                            size: 16,
-                            color: platform.tint,
+                        itemBuilder: (_) => [
+                          const PopupMenuItem(
+                            value: -1,
+                            child: Text('Todas as lojas'),
                           ),
-                          selected: _filter == platform && !_onlyFreeHub,
-                          onSelected: (_) => setState(() {
-                            _filter = platform;
-                            _onlyFreeHub = false;
-                          }),
+                          for (final store in _prefs.orderedPlatforms)
+                            PopupMenuItem(
+                              value: store.index,
+                              child: Text(store.label),
+                            ),
+                        ],
+                        child: Chip(
+                          label: Text(_filter?.shortLabel ?? 'Todas as lojas'),
+                          avatar: const Icon(
+                            Icons.storefront_outlined,
+                            size: 16,
+                          ),
                         ),
+                      ),
+                      PopupMenuButton<String>(
+                        tooltip: 'Filtros de oferta',
+                        onSelected: (tag) => setState(() {
+                          _activeSearchTag = tag.isEmpty ? null : tag;
+                        }),
+                        itemBuilder: (_) => [
+                          const PopupMenuItem(
+                            value: '',
+                            child: Text('Sem filtro rápido'),
+                          ),
+                          for (final tag in _quickSearchTags)
+                            PopupMenuItem(
+                              value: tag.id,
+                              child: Tooltip(
+                                message: tag.hint,
+                                child: Text(tag.label),
+                              ),
+                            ),
+                        ],
+                        child: Chip(
+                          label: Text(
+                            _quickSearchTags
+                                    .where((tag) => tag.id == _activeSearchTag)
+                                    .firstOrNull
+                                    ?.label ??
+                                'Filtros de oferta',
+                          ),
+                          avatar: const Icon(
+                            Icons.filter_list_rounded,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                      FilterChip(
+                        label: const Text('Grátis da semana'),
+                        selected: _onlyFreeHub,
+                        onSelected: (value) => setState(() {
+                          _onlyFreeHub = value;
+                          if (value) _filter = null;
+                        }),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   if (_filter == GamePlatform.xbox)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 16),
@@ -1315,7 +1153,7 @@ class _AppState extends State<App> with WidgetsBindingObserver {
               ),
             ),
           SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+            padding: EdgeInsets.symmetric(horizontal: gutter),
             sliver: SliverLayoutBuilder(
               builder: (context, constraints) => SliverGrid(
                 gridDelegate: DealGrid.delegate(

@@ -6,94 +6,113 @@ class DiscoveryHero extends StatelessWidget {
   const DiscoveryHero({
     super.key,
     required this.offerCount,
-    required this.storeCount,
     required this.onExplore,
+    required this.onRefresh,
+    required this.onAdd,
     this.featured,
   });
 
-  final int offerCount, storeCount;
+  final int offerCount;
   final GameDeal? featured;
-  final VoidCallback onExplore;
+  final VoidCallback onExplore, onAdd;
+  final VoidCallback? onRefresh;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final image = featured?.imageUrl;
-    const backdrop = Color(0xFF171421);
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: Stack(
-        children: [
-          const Positioned.fill(child: ColoredBox(color: backdrop)),
-          if (image != null)
-            Positioned.fill(
-              child: Image.network(
-                image,
-                fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-                cacheWidth: 1280,
-                excludeFromSemantics: true,
-                errorBuilder: (_, _, _) => const SizedBox.shrink(),
-              ),
+    final offer = featured;
+    final image = offer?.imageUrl;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide =
+            constraints.maxWidth >= 660 &&
+            MediaQuery.textScalerOf(context).scale(16) <= 21;
+        final heading = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Ofertas de jogos', style: theme.textTheme.headlineMedium),
+            Text(
+              '$offerCount ofertas disponíveis',
+              style: theme.textTheme.bodySmall,
             ),
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    backdrop,
-                    backdrop.withValues(alpha: image == null ? .92 : .84),
-                    const Color(0x80302A55),
+          ],
+        );
+        final actions = Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            IconButton(
+              tooltip: 'Atualizar ofertas',
+              onPressed: onRefresh,
+              icon: const Icon(Icons.refresh_rounded),
+            ),
+            OutlinedButton.icon(
+              onPressed: onAdd,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Adicionar à lista'),
+            ),
+          ],
+        );
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (wide)
+                Row(
+                  children: [
+                    Expanded(child: heading),
+                    actions,
                   ],
-                  stops: const [0, .38, 1],
+                )
+              else ...[
+                heading,
+                const SizedBox(height: 8),
+                actions,
+              ],
+              if (offer != null) ...[
+                const SizedBox(height: 12),
+                Card(
+                  clipBehavior: Clip.antiAlias,
+                  child: ListTile(
+                    onTap: onExplore,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    leading: image == null
+                        ? Icon(
+                            Icons.local_offer_outlined,
+                            color: colors.primary,
+                          )
+                        : ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: Image.network(
+                              image,
+                              width: 48,
+                              height: 40,
+                              fit: BoxFit.cover,
+                              cacheWidth: 144,
+                              excludeFromSemantics: true,
+                              errorBuilder: (_, _, _) =>
+                                  const SizedBox(width: 48),
+                            ),
+                          ),
+                    title: Text(
+                      offer.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(offer.formattedPrice),
+                    trailing: const Icon(Icons.arrow_downward_rounded),
+                  ),
                 ),
-              ),
-            ),
+              ],
+            ],
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 450),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    featured?.title ?? 'Ofertas de jogos',
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.headlineLarge?.copyWith(
-                      color: const Color(0xFFF8F7FF),
-                      height: 1.08,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    featured == null
-                        ? '$offerCount ofertas em $storeCount lojas'
-                        : '${featured!.formattedPrice} · $offerCount ofertas em $storeCount lojas',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: const Color(0xFFDED9EF),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  FilledButton.icon(
-                    onPressed: onExplore,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFBCACFF),
-                      foregroundColor: const Color(0xFF211743),
-                      shadowColor: colors.shadow,
-                    ),
-                    icon: const Icon(Icons.arrow_forward_rounded, size: 18),
-                    iconAlignment: IconAlignment.end,
-                    label: const Text('Explorar ofertas'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

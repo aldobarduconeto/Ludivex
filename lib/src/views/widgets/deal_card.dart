@@ -70,8 +70,6 @@ class DealCard extends StatefulWidget {
 }
 
 class _DealCardState extends State<DealCard> {
-  bool _hovered = false;
-
   Future<void> _shareDeal(BuildContext context, GameDeal deal) async {
     final savingsText = deal.discount > 0 ? ' (${deal.discount}% OFF)' : '';
     final priceText = (deal.isFree || deal.discount >= 100)
@@ -93,465 +91,181 @@ class _DealCardState extends State<DealCard> {
 
   @override
   Widget build(BuildContext context) {
-    final deal = widget.deal, c = Theme.of(context).colorScheme;
+    final deal = widget.deal;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final unknown = deal.sourceLabel == 'Aguardando atualização do preço';
-    final is100Free = deal.isFree || deal.discount >= 100;
-    final isSuperDiscount = deal.discount >= 80;
+    final free = deal.isFree || deal.discount >= 100;
+    final image = deal.imageUrl;
+    final original =
+        !unknown && deal.originalPrice > 0 && (free || deal.discount > 0);
+    final expiry = deal.expiresAt;
+    final canOpen = deal.storeUrl != null;
+    final storeText = [
+      deal.platform.label,
+      if (deal.platform == GamePlatform.xbox) deal.xboxCompatibility.label,
+    ].join(' · ');
+    final fallback = Center(
+      child: Icon(deal.platform.icon, size: 36, color: colors.onSurfaceVariant),
+    );
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: AnimatedContainer(
-        duration: MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : const Duration(milliseconds: 140),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: _hovered
-                ? c.secondary.withValues(alpha: .55)
-                : c.outlineVariant.withValues(alpha: .4),
-          ),
-          boxShadow: _hovered
-              ? [
-                  BoxShadow(
-                    color: c.primary.withValues(alpha: 0.08),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: canOpen ? () => openStore(context, deal) : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              height: widget.compact ? 88 : 140,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ColoredBox(
+                    color: colors.surfaceContainerHighest,
+                    child: image == null
+                        ? fallback
+                        : Image.network(
+                            image,
+                            fit: BoxFit.cover,
+                            cacheWidth: 640,
+                            excludeFromSemantics: true,
+                            errorBuilder: (_, _, _) => fallback,
+                          ),
                   ),
-                ]
-              : null,
-        ),
-        child: Material(
-          color: c.surface,
-          borderRadius: BorderRadius.circular(17),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: deal.storeUrl == null
-                ? null
-                : () => openStore(context, deal),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(
-                  height: widget.compact ? 92 : 160,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      DecoratedBox(
+                  if (!unknown && (free || deal.discount > 0))
+                    Positioned(
+                      top: 10,
+                      left: 10,
+                      child: DecoratedBox(
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              deal.platform.tint.withValues(alpha: .24),
-                              c.surfaceContainerHighest,
-                            ],
-                          ),
+                          color: colors.primaryContainer,
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                        child: deal.imageUrl == null
-                            ? Center(
-                                child: Icon(
-                                  deal.platform.icon,
-                                  size: 54,
-                                  color: deal.platform.tint.withValues(
-                                    alpha: .65,
-                                  ),
-                                ),
-                              )
-                            : Image.network(
-                                gaplessPlayback: true,
-                                deal.imageUrl!,
-                                fit: BoxFit.cover,
-                                cacheWidth: 640,
-                                filterQuality: FilterQuality.low,
-                                excludeFromSemantics: true,
-                                errorBuilder: (_, __, ___) => Center(
-                                  child: Icon(
-                                    deal.platform.icon,
-                                    size: 48,
-                                    color: deal.platform.tint,
-                                  ),
-                                ),
-                              ),
-                      ),
-                      const DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Color(0x33000000),
-                              Colors.transparent,
-                              Color(0x88000000),
-                            ],
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          child: Text(
+                            free ? 'Grátis' : '−${deal.discount}%',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: colors.onPrimaryContainer,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ),
-                      Positioned(
-                        left: 10,
-                        right: 60,
-                        top: 10,
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.topLeft,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  gradient: is100Free
-                                      ? const LinearGradient(
-                                          colors: [
-                                            Color(0xFF20B969),
-                                            Color(0xFF138A4B),
-                                          ],
-                                        )
-                                      : isSuperDiscount
-                                      ? const LinearGradient(
-                                          colors: [
-                                            Color(0xFFFF3D00),
-                                            Color(0xFFD50000),
-                                          ],
-                                        )
-                                      : null,
-                                  color: (is100Free || isSuperDiscount)
-                                      ? null
-                                      : const Color(0xFFBDF46B),
-                                  borderRadius: BorderRadius.circular(7),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.35,
-                                      ),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (is100Free) ...[
-                                      const Icon(
-                                        Icons.card_giftcard_rounded,
-                                        size: 13,
-                                        color: Colors.white,
-                                      ),
-                                      const SizedBox(width: 4),
-                                    ] else if (isSuperDiscount) ...[
-                                      const Icon(
-                                        Icons.local_fire_department_rounded,
-                                        size: 13,
-                                        color: Colors.white,
-                                      ),
-                                      const SizedBox(width: 3),
-                                    ],
-                                    Text(
-                                      unknown
-                                          ? 'SALVO'
-                                          : is100Free
-                                          ? '100% GRÁTIS'
-                                          : deal.discount > 0
-                                          ? '${deal.discount}% OFF'
-                                          : 'PREÇO ATUAL',
-                                      style: TextStyle(
-                                        fontSize: widget.compact ? 14 : 16,
-                                        color: is100Free || isSuperDiscount
-                                            ? Colors.white
-                                            : const Color(0xFF14210A),
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: .2,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                    ),
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: IconButton.filledTonal(
+                      tooltip: widget.saved
+                          ? 'Remover da lista'
+                          : 'Acompanhar preço',
+                      onPressed: widget.onToggle,
+                      style: IconButton.styleFrom(
+                        backgroundColor: colors.surface,
+                        foregroundColor: widget.saved
+                            ? colors.primary
+                            : colors.onSurfaceVariant,
                       ),
-                      Positioned(
-                        right: 8,
-                        top: 7,
-                        child: IconButton.filledTonal(
-                          tooltip: widget.saved
-                              ? 'Remover da lista'
-                              : 'Acompanhar preço',
-                          onPressed: widget.onToggle,
-                          style: IconButton.styleFrom(
-                            backgroundColor: const Color(0xC4161D27),
-                            minimumSize: const Size(36, 36),
-                          ),
-                          icon: Icon(
-                            widget.saved
-                                ? Icons.favorite_rounded
-                                : Icons.favorite_border_rounded,
-                            color: widget.saved
-                                ? const Color(0xFFF198B6)
-                                : Colors.white,
-                            size: 18,
-                          ),
-                        ),
+                      icon: Icon(
+                        widget.saved
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
+                        size: 18,
                       ),
-                    ],
+                    ),
                   ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: widget.compact
-                        ? const EdgeInsets.all(12)
-                        : const EdgeInsets.fromLTRB(16, 14, 16, 14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                ],
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 8, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      deal.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      storeText,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall,
+                    ),
+                    if (!widget.current || deal.isExpired || expiry != null)
+                      Text(
+                        !widget.current || deal.isExpired
+                            ? 'Último preço visto'
+                            : _formatExpiry(expiry!),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    const Spacer(),
+                    Row(
                       children: [
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 6,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 7,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF172131),
-                                borderRadius: BorderRadius.circular(9),
-                                border: Border.all(
-                                  color: deal.platform.tint.withValues(
-                                    alpha: .65,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (original)
+                                Text(
+                                  deal.formattedOriginalPrice,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    decoration: TextDecoration.lineThrough,
                                   ),
-                                  width: .8,
                                 ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    deal.platform.icon,
-                                    size: 17,
-                                    color: deal.platform.tint,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      deal.platform.label,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w800,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (widget.compact &&
-                                deal.expiresAt != null &&
-                                !deal.isExpired)
-                              Tooltip(
-                                message: _formatExpiry(deal.expiresAt!),
-                                child: Icon(
-                                  Icons.timer_outlined,
-                                  size: 14,
-                                  color: c.onSurfaceVariant,
-                                ),
-                              ),
-                            if (!widget.compact &&
-                                deal.expiresAt != null &&
-                                !deal.isExpired) ...[
-                              const SizedBox(width: 6),
-                              Icon(
-                                Icons.timer_outlined,
-                                size: 11,
-                                color: c.onSurfaceVariant,
-                              ),
-                              const SizedBox(width: 2),
                               Text(
-                                _formatExpiry(deal.expiresAt!),
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w600,
-                                  color: c.onSurfaceVariant,
+                                unknown
+                                    ? 'Aguardando preço'
+                                    : free
+                                    ? 'Grátis'
+                                    : deal.formattedPrice,
+                                maxLines: unknown ? 2 : 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  color: free
+                                      ? colors.primary
+                                      : colors.onSurface,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ],
-                            if (!widget.current || deal.isExpired)
-                              Text(
-                                'Último preço visto',
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  color: c.onSurfaceVariant,
-                                ),
-                              ),
-                          ],
-                        ),
-                        if (deal.platform == GamePlatform.xbox)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 6),
-                            child: Text(
-                              deal.xboxCompatibility.label,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: c.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                        SizedBox(height: widget.compact ? 6 : 8),
-                        Text(
-                          deal.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: widget.compact ? 13 : 15,
-                            height: 1.3,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -.2,
-                            color: c.onSurface,
                           ),
                         ),
-                        const Spacer(),
-                        Divider(
-                          height: widget.compact ? 12 : 21,
-                          thickness: .7,
-                          color: c.outlineVariant.withValues(alpha: .55),
+                        IconButton(
+                          tooltip: 'Compartilhar oferta',
+                          icon: const Icon(Icons.share_outlined, size: 17),
+                          onPressed: () => _shareDeal(context, deal),
                         ),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (!unknown &&
-                                      (deal.discount > 0 || is100Free))
-                                    Wrap(
-                                      spacing: 5,
-                                      runSpacing: 4,
-                                      children: [
-                                        Text(
-                                          is100Free && deal.originalPrice > 0
-                                              ? 'De ${deal.formattedOriginalPrice}'
-                                              : deal.formattedOriginalPrice,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: c.onSurfaceVariant,
-                                            decoration:
-                                                TextDecoration.lineThrough,
-                                          ),
-                                        ),
-                                        if (!widget.compact &&
-                                            deal
-                                                .formattedSavings
-                                                .isNotEmpty) ...[
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 4,
-                                              vertical: 1,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color:
-                                                  (is100Free || isSuperDiscount)
-                                                  ? (is100Free
-                                                        ? const Color(
-                                                            0xFF20B969,
-                                                          ).withValues(
-                                                            alpha: .18,
-                                                          )
-                                                        : Colors.redAccent
-                                                              .withValues(
-                                                                alpha: .18,
-                                                              ))
-                                                  : c.onSurfaceVariant
-                                                        .withValues(alpha: .12),
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                            ),
-                                            child: Text(
-                                              is100Free
-                                                  ? 'Economize 100%'
-                                                  : '−${deal.formattedSavings}',
-                                              style: TextStyle(
-                                                fontSize: 8.5,
-                                                fontWeight: FontWeight.w700,
-                                                color: is100Free
-                                                    ? const Color(0xFF20B969)
-                                                    : isSuperDiscount
-                                                    ? Colors.redAccent
-                                                    : c.onSurfaceVariant,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    unknown
-                                        ? 'Aguardando preço'
-                                        : is100Free
-                                        ? '100% GRÁTIS'
-                                        : deal.formattedPrice,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: widget.compact ? 18 : 22,
-                                      height: 1.1,
-                                      letterSpacing: -.6,
-                                      fontWeight: FontWeight.w800,
-                                      color: is100Free
-                                          ? const Color(0xFF20B969)
-                                          : c.onSurface,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              tooltip: 'Compartilhar oferta',
-                              icon: const Icon(Icons.share_outlined, size: 18),
-                              onPressed: () => _shareDeal(context, deal),
-                            ),
-                            const SizedBox(width: 4),
-                            IconButton.filledTonal(
-                              tooltip: 'Ver oferta na loja',
-                              onPressed: deal.storeUrl == null
-                                  ? null
-                                  : () => openStore(context, deal),
-                              style: IconButton.styleFrom(
-                                backgroundColor: deal.platform.tint.withValues(
-                                  alpha: .12,
-                                ),
-                                foregroundColor: deal.platform.tint,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                              icon: const Icon(
-                                Icons.arrow_outward_rounded,
-                                size: 19,
-                              ),
-                            ),
-                          ],
+                        IconButton(
+                          tooltip: 'Ver oferta na loja',
+                          onPressed: canOpen
+                              ? () => openStore(context, deal)
+                              : null,
+                          icon: const Icon(
+                            Icons.arrow_outward_rounded,
+                            size: 19,
+                          ),
                         ),
                       ],
                     ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );

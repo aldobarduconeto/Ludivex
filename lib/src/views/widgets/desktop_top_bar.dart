@@ -45,9 +45,9 @@ class DesktopTopBar extends StatelessWidget {
           Column(
             children: [
               Material(
-                color: colors.surfaceContainer,
+                color: colors.surface,
                 child: SizedBox(
-                  height: 48,
+                  height: 44,
                   child: Row(
                     children: [
                       Expanded(

@@ -211,18 +211,13 @@ class _StoreScreenState extends State<StoreScreen> {
         appBar: AppBar(title: const Text('Lojas e compatibilidade')),
         body: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 760),
+            constraints: const BoxConstraints(maxWidth: 1080),
             child: CustomScrollView(
               slivers: [
                 SliverPadding(
                   padding: const EdgeInsets.all(24),
                   sliver: SliverList.list(
                     children: [
-                      const PageIntro(
-                        title: 'Contas e instalação',
-                        description: 'Conecte suas lojas para reunir os jogos na Biblioteca.',
-                        icon: Icons.storefront_outlined,
-                      ),
                       SectionPanel(
                         title: 'Conta da loja',
                         icon: Icons.manage_accounts_outlined,

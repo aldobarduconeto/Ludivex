@@ -20,6 +20,7 @@ class GameDeviceBridge(private val activity: Activity, messenger: BinaryMessenge
     private var connection: BluetoothGatt? = null
     private var timeout: Runnable? = null
     private val values = mutableMapOf<String, Any>()
+    private val lastDetails = mutableMapOf<String, Map<String, Any>>()
     private val queue = java.util.ArrayDeque<BluetoothGattCharacteristic>()
     private val batteryId = uuid("2a19")
     private val firmwareId = uuid("2a26")
@@ -32,6 +33,7 @@ class GameDeviceBridge(private val activity: Activity, messenger: BinaryMessenge
     init {
         MethodChannel(messenger, "ludivex/devices").setMethodCallHandler { call, result ->
             when (call.method) {
+                "hasPermission" -> result.success(permitted())
                 "requestPermission" -> {
                     if (permitted()) {
                         result.success(true)
@@ -109,6 +111,7 @@ class GameDeviceBridge(private val activity: Activity, messenger: BinaryMessenge
                         BluetoothClass.Device.AUDIO_VIDEO_HANDSFREE) -> "headset"
                     major == BluetoothClass.Device.Major.PERIPHERAL &&
                         ((deviceClass and 0x3c) == 0x04 || (deviceClass and 0x3c) == 0x08) -> "controller"
+                    major == BluetoothClass.Device.Major.PERIPHERAL -> "other"
                     else -> null
                 }
                 if (kind == null) null else {
@@ -123,6 +126,7 @@ class GameDeviceBridge(private val activity: Activity, messenger: BinaryMessenge
                         "kind" to kind,
                         "gattReadable" to (device.type == BluetoothDevice.DEVICE_TYPE_LE || device.type == BluetoothDevice.DEVICE_TYPE_DUAL)
                     )
+                    lastDetails[device.address]?.let { map.putAll(it) }
                     if (battery != null) map["battery"] = battery
                     map
                 }
@@ -212,7 +216,13 @@ class GameDeviceBridge(private val activity: Activity, messenger: BinaryMessenge
     private fun finish() {
         timeout?.let { handler.removeCallbacks(it) }
         timeout = null
-        connection?.close()
+        connection?.let { gatt ->
+            if (values.isNotEmpty()) {
+                val address = gatt.device.address
+                lastDetails[address] = lastDetails[address].orEmpty() + values
+            }
+            gatt.close()
+        }
         connection = null
         queue.clear()
         val result = pendingRead

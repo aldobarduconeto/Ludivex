@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import '../models/gaming_device.dart';
 import 'bluetooth_device_kind.dart';
+import 'windows_controller_battery.dart';
 
 bool get supported => Platform.isWindows || Platform.isLinux;
 
@@ -171,7 +173,10 @@ final _encodedWindowsBluetoothScript = base64Encode(
   windowsBluetoothScript.codeUnits.expand((c) => [c & 255, c >> 8]).toList(),
 );
 
-final _batteryRegex = RegExp(r'Battery Percentage: \(0x[0-9a-fA-F]+\) (\d+)');
+final _batteryRegex = RegExp(
+  r'^[\t ]*Battery Percentage:[\t ]*(?:0x[0-9a-fA-F]+[\t ]*\((\d+)\)|\(0x[0-9a-fA-F]+\)[\t ]*(\d+)|(\d+))[\t \r]*$',
+  multiLine: true,
+);
 final _mfgRegex = RegExp(r'Manufacturer: (.+)');
 
 Future<List<GamingDevice>> scan() async {
@@ -179,15 +184,32 @@ Future<List<GamingDevice>> scan() async {
   if (!supported) {
     throw UnsupportedError('Detecção disponível no Android e Windows.');
   }
+  final controllers = Isolate.run(readWindowsControllerBatteries);
+  try {
+    final bluetooth = await _windowsBluetoothDevices();
+    return [...bluetooth, ...await controllers];
+  } on Object {
+    final xinput = await controllers;
+    if (xinput.isEmpty) rethrow;
+    return xinput;
+  }
+}
+
+Future<List<GamingDevice>> _windowsBluetoothDevices() async {
   final root = Platform.environment['SystemRoot'] ?? r'C:\Windows';
   final process = await Process.start(
     '$root\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
-    ['-NoProfile', '-NonInteractive', '-EncodedCommand', _encodedWindowsBluetoothScript],
+    [
+      '-NoProfile',
+      '-NonInteractive',
+      '-EncodedCommand',
+      _encodedWindowsBluetoothScript,
+    ],
   );
   final output = process.stdout.transform(utf8.decoder).join();
   final errors = process.stderr.transform(utf8.decoder).join();
   final exit = await process.exitCode.timeout(
-    const Duration(seconds: 25),
+    const Duration(seconds: 17),
     onTimeout: () {
       process.kill();
       throw TimeoutException('A consulta Bluetooth demorou demais.');
@@ -226,47 +248,123 @@ Future<ProcessResult> _bluez(List<String> arguments) async {
 }
 
 Future<List<GamingDevice>> _linuxDevices() async {
+  final hid = _linuxHidBatteries();
+  final devices = <String, GamingDevice>{};
   try {
     final res = await _bluez(const ['devices']);
-    if (res.exitCode != 0) return const [];
-    final lines = (res.stdout as String).split('\n');
-    final devices = <GamingDevice>[];
-    for (final line in lines) {
-      final trimmed = line.trim();
-      if (!trimmed.startsWith('Device ')) continue;
-      final parts = trimmed.split(' ');
-      if (parts.length < 3) continue;
-      final mac = parts[1];
-      final name = parts.sublist(2).join(' ');
-      final kindStr = bluetoothDeviceKind(name);
-      final kind = switch (kindStr) {
-        'controller' => GamingDeviceKind.controller,
-        'headset' => GamingDeviceKind.headset,
-        _ => GamingDeviceKind.other,
-      };
-      final info = await _bluez(['info', mac]);
-      int? battery;
-      var manufacturer = '';
-      if (info.exitCode == 0) {
-        final infoOut = info.stdout as String;
-        final match = _batteryRegex.firstMatch(infoOut);
-        if (match != null) battery = int.tryParse(match.group(1)!);
-        final mfgMatch = _mfgRegex.firstMatch(infoOut);
-        if (mfgMatch != null) manufacturer = mfgMatch.group(1)!.trim();
-      }
-      devices.add(
-        GamingDevice(
-          id: mac,
-          name: name,
-          kind: kind,
-          seenAt: DateTime.now(),
-          manufacturer: manufacturer,
-          battery: battery,
-        ),
+    if (res.exitCode == 0) {
+      final rows = RegExp(
+        r'^Device ([0-9a-fA-F:]{17}) (.+)$',
+        multiLine: true,
+      ).allMatches(res.stdout as String);
+      final bluetooth = await Future.wait(
+        rows.map((row) async {
+          final mac = row.group(1)!;
+          final name = row.group(2)!.trim();
+          var manufacturer = '';
+          int? battery;
+          try {
+            final info = await _bluez(['info', mac]);
+            if (info.exitCode == 0) {
+              final output = info.stdout as String;
+              final match = _batteryRegex.firstMatch(output);
+              final raw = match?.group(1) ?? match?.group(2) ?? match?.group(3);
+              battery = _validPercent(raw);
+              manufacturer =
+                  _mfgRegex.firstMatch(output)?.group(1)?.trim() ?? '';
+            }
+          } on Exception {
+            // Ainda lista o periférico quando o nível não pôde ser consultado.
+          }
+          return GamingDevice(
+            id: mac,
+            name: name,
+            kind: _linuxKind(name),
+            seenAt: DateTime.now(),
+            manufacturer: manufacturer,
+            battery: battery,
+          );
+        }),
       );
+      devices.addEntries(bluetooth.map((d) => MapEntry(d.id.toUpperCase(), d)));
     }
-    return devices;
-  } catch (_) {
-    return const [];
+  } on Exception {
+    // A bateria HID continua disponível em sistemas sem BlueZ.
   }
+  for (final device in await hid) {
+    final key = device.id.toUpperCase();
+    final bluetooth = devices[key];
+    if (bluetooth == null) {
+      devices[key] = device;
+    } else if (bluetooth.battery == null) {
+      devices[key] = GamingDevice.fromJson({
+        ...bluetooth.toJson(),
+        'battery': device.battery,
+      });
+    }
+  }
+  return devices.values.toList();
+}
+
+GamingDeviceKind _linuxKind(String name) => switch (bluetoothDeviceKind(name)) {
+  'controller' => GamingDeviceKind.controller,
+  'headset' => GamingDeviceKind.headset,
+  _ => GamingDeviceKind.other,
+};
+
+int? _validPercent(String? raw) {
+  final value = int.tryParse(raw ?? '');
+  return value != null && value >= 0 && value <= 100 ? value : null;
+}
+
+Future<List<GamingDevice>> _linuxHidBatteries() async {
+  final devices = <GamingDevice>[];
+  final supplies = Directory('/sys/class/power_supply');
+  try {
+    await for (final entry in supplies.list(followLinks: false)) {
+      try {
+        final path = entry.path;
+        final properties = await File('$path/device/uevent').readAsString();
+        final bus = RegExp(
+          r'^HID_ID=(0003|0005):',
+          multiLine: true,
+        ).firstMatch(properties)?.group(1);
+        final name = RegExp(
+          r'^HID_NAME=(.+)$',
+          multiLine: true,
+        ).firstMatch(properties)?.group(1)?.trim();
+        if (bus == null || name == null || name.isEmpty) continue;
+        final String id;
+        if (bus == '0005') {
+          final address = RegExp(
+            r'^HID_UNIQ=([0-9a-fA-F:]{17})$',
+            multiLine: true,
+          ).firstMatch(properties)?.group(1);
+          if (address == null) continue;
+          id = address.toUpperCase();
+        } else {
+          id = 'linux:hid:${entry.uri.pathSegments.last}';
+        }
+        final capacity = await File('$path/capacity').readAsString();
+        final battery = _validPercent(capacity.trim());
+        if (battery == null) continue;
+        devices.add(
+          GamingDevice(
+            id: id,
+            name: name,
+            kind: _linuxKind(name),
+            seenAt: DateTime.now(),
+            battery: battery,
+            manufacturer: bus == '0003' ? 'Linux HID' : '',
+            model: bus == '0003' ? name : null,
+          ),
+        );
+      } on FileSystemException {
+        // O dispositivo pode ter sido desconectado entre a listagem e a leitura.
+      }
+    }
+  } on FileSystemException {
+    // Alguns kernels não publicam baterias de periféricos no sysfs.
+  }
+  return devices;
 }
