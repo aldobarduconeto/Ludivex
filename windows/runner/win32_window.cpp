@@ -1,5 +1,6 @@
 #include "win32_window.h"
 
+#include <algorithm>
 #include <dwmapi.h>
 #include <flutter_windows.h>
 
@@ -134,10 +135,28 @@ bool Win32Window::Create(const std::wstring& title,
   UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
   double scale_factor = dpi / 96.0;
 
+  int x = Scale(origin.x, scale_factor);
+  int y = Scale(origin.y, scale_factor);
+  int width = Scale(size.width, scale_factor);
+  int height = Scale(size.height, scale_factor);
+  MONITORINFO monitor_info{};
+  monitor_info.cbSize = sizeof(monitor_info);
+  if (GetMonitorInfo(monitor, &monitor_info)) {
+    const RECT& work = monitor_info.rcWork;
+    const int left = work.left;
+    const int top = work.top;
+    const int work_width = work.right - work.left;
+    const int work_height = work.bottom - work.top;
+    const int margin = Scale(16, scale_factor);
+    width = std::min(width, std::max(1, work_width - 2 * margin));
+    height = std::min(height, std::max(1, work_height - 2 * margin));
+    x = std::clamp(x, left, left + work_width - width);
+    y = std::clamp(y, top, top + work_height - height);
+  }
+
   HWND window = CreateWindow(
       window_class, title.c_str(), WS_OVERLAPPEDWINDOW,
-      Scale(origin.x, scale_factor), Scale(origin.y, scale_factor),
-      Scale(size.width, scale_factor), Scale(size.height, scale_factor),
+      x, y, width, height,
       nullptr, nullptr, GetModuleHandle(nullptr), this);
 
   if (!window) {
@@ -150,7 +169,12 @@ bool Win32Window::Create(const std::wstring& title,
 }
 
 bool Win32Window::Show() {
-  return ShowWindow(window_handle_, SW_SHOWNORMAL);
+  const bool was_visible = ShowWindow(window_handle_, SW_SHOWNORMAL);
+  // Windows can use the launcher's show state on the first ShowWindow call.
+  if (IsZoomed(window_handle_) || IsIconic(window_handle_)) {
+    ShowWindow(window_handle_, SW_RESTORE);
+  }
+  return was_visible;
 }
 
 // static
@@ -179,6 +203,22 @@ Win32Window::MessageHandler(HWND hwnd,
                             WPARAM const wparam,
                             LPARAM const lparam) noexcept {
   switch (message) {
+    case WM_GETMINMAXINFO: {
+      // The custom caption removes WS_CAPTION. Keep maximization in the
+      // monitor's work area so the window does not cover the taskbar.
+      MONITORINFO monitor_info{};
+      monitor_info.cbSize = sizeof(monitor_info);
+      const HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+      if (GetMonitorInfo(monitor, &monitor_info)) {
+        auto* limits = reinterpret_cast<MINMAXINFO*>(lparam);
+        const RECT& work = monitor_info.rcWork;
+        const RECT& bounds = monitor_info.rcMonitor;
+        limits->ptMaxPosition = {work.left - bounds.left, work.top - bounds.top};
+        limits->ptMaxSize = {work.right - work.left, work.bottom - work.top};
+        return 0;
+      }
+      break;
+    }
     case WM_DESTROY:
       window_handle_ = nullptr;
       Destroy();
